@@ -1,0 +1,35 @@
+appId: com.lexio.app
+productName: Lexio
+copyright: Copyright © 2026 Lexio
+
+directories:
+  output: dist-build
+  buildResources: public
+
+files:
+  - dist/**/*
+  - dist-main/**/*
+  - package.json
+  - public/**/*
+
+# Windows configuration
+win:
+  target: nsis
+  icon: public/icon.png
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+
+# Mac configuration
+mac:
+  target: dmg
+  icon: public/icon.png
+  category: public.app-category.education
+
+# Linux configuration
+linux:
+  target: AppImage
+  category: Education
+  icon: public/icon.png
