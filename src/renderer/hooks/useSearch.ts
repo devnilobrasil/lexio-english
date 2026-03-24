@@ -7,11 +7,13 @@ export function useSearch() {
   const [word, setWord] = useState<Word | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
-  const search = async (query: string) => {
-    const trimmed = query.trim().toLowerCase()
+  const search = async (searchTerm: string) => {
+    const trimmed = searchTerm.trim().toLowerCase()
     if (!trimmed) return
 
+    setQuery(trimmed)
     setLoading(true)
     setError(null)
 
@@ -51,5 +53,5 @@ export function useSearch() {
     }
   }
 
-  return { word, loading, error, search, toggleSaved, setWord }
+  return { word, loading, error, search, toggleSaved, setWord, query }
 }
