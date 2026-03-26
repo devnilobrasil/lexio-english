@@ -1,0 +1,35 @@
+{
+  "nav": {
+    "search": "Buscar",
+    "saved": "Guardados",
+    "history": "Historial"
+  },
+  "search": {
+    "placeholder": "Busca una palabra en inglés...",
+    "recent": "Búsquedas recientes",
+    "empty": "Tus búsquedas aparecerán aquí."
+  },
+  "word": {
+    "save": "Guardar",
+    "saved": "Guardado",
+    "meaning": "Significado",
+    "examples": "Ejemplos"
+  },
+  "level": {
+    "Basic": "Básico",
+    "Intermediate": "Intermedio",
+    "Advanced": "Avanzado",
+    "Technical": "Técnico"
+  },
+  "history": {
+    "title": "Búsquedas Recientes",
+    "empty_title": "Historial vacío",
+    "empty_desc": "Las palabras que busques aparecerán aquí automáticamente.",
+    "seen_on": "Visto el {{date}}"
+  },
+  "saved": {
+    "title": "Tu Vocabulario ({{count}})",
+    "empty_title": "Sin palabras guardadas",
+    "empty_desc": "Las palabras que marques como favoritas aparecerán aquí."
+  }
+}

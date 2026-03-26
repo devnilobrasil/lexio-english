@@ -1,0 +1,35 @@
+{
+  "nav": {
+    "search": "Busca",
+    "saved": "Salvos",
+    "history": "Histórico"
+  },
+  "search": {
+    "placeholder": "Busque uma palavra em inglês...",
+    "recent": "Histórico recente",
+    "empty": "Sua busca aparecerá aqui."
+  },
+  "word": {
+    "save": "Salvar",
+    "saved": "Salvo",
+    "meaning": "Significado",
+    "examples": "Exemplos"
+  },
+  "level": {
+    "Basic": "Básico",
+    "Intermediate": "Intermediário",
+    "Advanced": "Avançado",
+    "Technical": "Técnico"
+  },
+  "history": {
+    "title": "Buscas Recentes",
+    "empty_title": "Histórico vazio",
+    "empty_desc": "As palavras que você pesquisar aparecerão aqui automaticamente.",
+    "seen_on": "Visto em {{date}}"
+  },
+  "saved": {
+    "title": "Seu Vocabulário ({{count}})",
+    "empty_title": "Nenhuma palavra salva",
+    "empty_desc": "As palavras que você marcar como favoritas aparecerão aqui."
+  }
+}

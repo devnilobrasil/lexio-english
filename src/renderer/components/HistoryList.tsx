@@ -1,19 +1,24 @@
 // src/renderer/components/HistoryList.tsx
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
+import { SectionLabel } from './SectionLabel'
 
 interface HistoryListProps {
   words: Word[]
   onSelect: (word: string) => void
+  onRemove: (word: string) => void
 }
 
-export function HistoryList({ words, onSelect }: HistoryListProps) {
+export function HistoryList({ words, onSelect, onRemove }: HistoryListProps) {
+  const { t } = useTranslation()
+
   if (words.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in duration-700">
-        <p className="font-sans text-[12px] font-medium tracking-[1px] uppercase text-text-faint mb-3">Histórico vazio</p>
-        <p className="font-serif text-sm text-text-muted italic max-w-[250px]">
-          As palavras que você pesquisar aparecerão aqui automaticamente.
+        <p className="font-sans text-meta font-medium tracking-label uppercase text-text-faint mb-3">{t('history.empty_title')}</p>
+        <p className="font-serif text-sm text-text-muted italic max-w-64">
+          {t('history.empty_desc')}
         </p>
       </div>
     )
@@ -21,28 +26,37 @@ export function HistoryList({ words, onSelect }: HistoryListProps) {
 
   return (
     <div className="animate-in fade-in duration-500">
-      <p className="section-label px-1">Buscas Recentes</p>
-      
+      <SectionLabel className="px-1">{t('history.title')}</SectionLabel>
+
       <div className="flex flex-col border-t border-border-subtle">
         {words.map((w) => (
-          <div 
+          <div
             key={w.word}
             className="group flex items-center justify-between py-4 border-b border-border-muted cursor-pointer transition-colors hover:bg-surface-hover px-2 rounded-sm"
             onClick={() => onSelect(w.word)}
           >
             <div className="flex flex-col gap-1">
               <h4 className="font-serif text-lg font-semibold text-text-primary leading-tight">{w.word}</h4>
-              <div className="flex items-center gap-[6px]">
-                <span className="font-sans text-[10px] text-text-faint tracking-[0.5px] uppercase">
-                  Visto em {w.last_viewed ? new Date(w.last_viewed).toLocaleDateString() : 'hoje'}
+              <div className="flex items-center gap-1.5">
+                <span className="font-sans text-label text-text-faint tracking-caps uppercase">
+                  {t('history.seen_on', { date: w.last_viewed ? new Date(w.last_viewed).toLocaleDateString() : '—' })}
                 </span>
                 {w.is_saved === 1 && (
-                  <div className="w-[6px] h-[6px] rounded-full bg-accent-text" title="Salva" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent-text" title="Salva" />
                 )}
               </div>
             </div>
 
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-faint group-hover:text-text-muted transition-colors"><polyline points="9 18 15 12 9 6"/></svg>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove(w.word)
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-md bg-surface-sunken text-text-faint hover:bg-surface-hover hover:text-status-error transition-colors cursor-pointer"
+              title="Remover do histórico"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
           </div>
         ))}
       </div>
