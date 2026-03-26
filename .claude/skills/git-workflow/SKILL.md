@@ -1,6 +1,7 @@
 ---
 name: git-workflow
 description: Orientações de git para o projeto Lexio — branch, commit, push e criação de PR. Usa o GitHub MCP quando disponível para criar PRs automaticamente.
+context: fork
 ---
 
 # Git Workflow Skill

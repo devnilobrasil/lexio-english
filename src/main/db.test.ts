@@ -1,7 +1,7 @@
 // src/main/db.test.ts
 import { vi, describe, it, expect, beforeAll, afterEach } from 'vitest'
 import os from 'os'
-import type { AIWordResponse } from '../../types'
+import type { AIWordResponse } from '../types'
 
 vi.mock('electron', () => ({
   app: { getPath: () => os.tmpdir() },

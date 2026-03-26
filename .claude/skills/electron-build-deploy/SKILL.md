@@ -1,6 +1,7 @@
 ---
 name: electron-build-deploy
 description: Sequência correta de build e distribuição do Lexio como app Electron. Inclui rebuild de módulos nativos (better-sqlite3), targets por OS e checklist pré-release.
+context: fork
 ---
 
 # Electron Build & Deploy Skill
