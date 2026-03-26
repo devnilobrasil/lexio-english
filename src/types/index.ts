@@ -48,7 +48,9 @@ export interface LexioAPI {
   getWord:        (word: string, locale: Locale)          => Promise<Word | null>
   saveWord:       (data: AIWordResponse, locale: Locale)  => Promise<Word>
   toggleSaved:    (word: string)                          => Promise<Word>
-  deleteWord:     (word: string)                          => Promise<void>
+  deleteWord:          (word: string) => Promise<void>
+  removeFromHistory:   (word: string) => Promise<void>
+  unsaveWord:          (word: string) => Promise<void>
   getHistory:     (locale: Locale, limit?: number)        => Promise<Word[]>
   getSaved:       (locale: Locale)                        => Promise<Word[]>
   closeWindow:    ()                                      => void

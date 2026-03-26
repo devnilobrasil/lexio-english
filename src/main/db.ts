@@ -61,8 +61,14 @@ export function init(): void {
     CREATE INDEX IF NOT EXISTS idx_trans   ON word_translations(word, locale);
   `)
 
+  // Migração: adicionar coluna in_history se não existir
+  const allCols = db.pragma('table_info(words)') as { name: string }[]
+  if (!allCols.some(c => c.name === 'in_history')) {
+    db.exec(`ALTER TABLE words ADD COLUMN in_history INTEGER DEFAULT 1`)
+  }
+
   // Migração: mover meaning_pt / meaning_en / examples para word_translations
-  const cols = db.pragma('table_info(words)') as { name: string }[]
+  const cols = allCols
   const hasMeaningPt = cols.some(c => c.name === 'meaning_pt')
 
   if (hasMeaningPt) {
@@ -159,6 +165,14 @@ export function deleteWord(word: string): void {
   db.prepare('DELETE FROM words WHERE word = ?').run(word)
 }
 
+export function removeFromHistory(word: string): void {
+  db.prepare('UPDATE words SET in_history = 0 WHERE word = ?').run(word)
+}
+
+export function unsaveWord(word: string): void {
+  db.prepare('UPDATE words SET is_saved = 0 WHERE word = ?').run(word)
+}
+
 export function getHistory(limit = 30, locale: Locale): Word[] {
   const safeLimit = Math.max(1, Math.floor(Number(limit) || 30))
   return (
@@ -166,6 +180,7 @@ export function getHistory(limit = 30, locale: Locale): Word[] {
       SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
       FROM words w
       LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
+      WHERE w.in_history = 1
       ORDER BY w.last_viewed DESC LIMIT ${safeLimit}
     `).all(locale) as WordRow[]
   ).map(deserialize)
