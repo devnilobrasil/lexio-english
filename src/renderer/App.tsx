@@ -1,5 +1,6 @@
 // src/renderer/App.tsx
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TitleBar } from './components/TitleBar'
 import { SearchBar } from './components/SearchBar'
 import { WordCard } from './components/WordCard'
@@ -7,21 +8,32 @@ import { SavedWords } from './components/SavedWords'
 import { HistoryList } from './components/HistoryList'
 import { Nav } from './components/Nav'
 import { StatusBar } from './components/StatusBar'
+import { SectionLabel } from './components/SectionLabel'
 import { useSearch } from './hooks/useSearch'
 import { useWords } from './hooks/useWords'
+import { useLocale } from './hooks/useLocale'
 
 type View = 'search' | 'saved' | 'history'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<View>('search')
   const { word, loading, error, search, toggleSaved, query } = useSearch()
-  const { savedWords, history, fetchSaved, fetchHistory, deleteWord, loading: wordsLoading } = useWords()
+  const { savedWords, history, fetchSaved, fetchHistory, deleteWord } = useWords()
+  const { t } = useTranslation()
+  const { locale } = useLocale()
+  const prevLocaleRef = useRef(locale)
 
-  // Sincroniza dados ao mudar de aba
   useEffect(() => {
     if (activeTab === 'saved') fetchSaved()
     if (activeTab === 'history' || activeTab === 'search') fetchHistory()
   }, [activeTab, fetchSaved, fetchHistory])
+
+  useEffect(() => {
+    if (prevLocaleRef.current !== locale) {
+      prevLocaleRef.current = locale
+      if (query) search(query)
+    }
+  }, [locale]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectWord = async (wordText: string) => {
     setActiveTab('search')
@@ -38,7 +50,7 @@ export default function App() {
     <div className="app-window rounded-xl border border-border-subtle">
       <TitleBar />
       <Nav activeView={activeTab} setActiveView={setActiveTab} />
-      
+
       <main className="app-body">
         {activeTab === 'search' && (
           <>
@@ -46,34 +58,34 @@ export default function App() {
 
             {loading && (
               <div className="flex flex-col items-start gap-4 py-2">
-                <span className="font-serif text-[42px] font-semibold text-[#D3D1C7] tracking-[-0.5px]">
+                <span className="font-serif text-word-title font-semibold text-separator tracking-title">
                   "{query}"
                 </span>
-                <div className="flex gap-[5px]">
-                  <span className="w-[5px] h-[5px] rounded-full bg-text-faint animate-pulse-dots" />
-                  <span className="w-[5px] h-[5px] rounded-full bg-text-faint animate-pulse-dots [animation-delay:0.2s]" />
-                  <span className="w-[5px] h-[5px] rounded-full bg-text-faint animate-pulse-dots [animation-delay:0.4s]" />
+                <div className="flex gap-1.25">
+                  <span className="w-1.25 h-1.25 rounded-full bg-text-faint animate-pulse-dots" />
+                  <span className="w-1.25 h-1.25 rounded-full bg-text-faint animate-pulse-dots dot-delay-1" />
+                  <span className="w-1.25 h-1.25 rounded-full bg-text-faint animate-pulse-dots dot-delay-2" />
                 </div>
               </div>
             )}
 
             {error && !loading && (
-              <div className="font-sans text-[13px] text-[#D85A30] py-2">
+              <div className="font-sans text-example text-status-error py-2">
                 {error}
               </div>
             )}
 
             {word && !loading && !error && (
-              <WordCard 
-                word={word} 
-                onToggleSaved={handleToggleSaved} 
+              <WordCard
+                word={word}
+                onToggleSaved={handleToggleSaved}
                 onSelectSynonym={search}
               />
             )}
 
             {!word && !loading && !error && (
               <div className="py-2 text-text-faint">
-                <p className="font-sans text-xs font-medium tracking-[1px] uppercase mb-3">Histórico recente</p>
+                <SectionLabel className="mb-3">{t('search.recent')}</SectionLabel>
                 <div className="flex flex-wrap gap-x-2 gap-y-2">
                   {history.slice(0, 5).map((h) => (
                     <button
@@ -85,7 +97,7 @@ export default function App() {
                     </button>
                   ))}
                   {history.length === 0 && (
-                    <p className="text-sm w-full text-center italic">Sua busca aparecerá aqui.</p>
+                    <p className="text-sm w-full text-center italic">{t('search.empty')}</p>
                   )}
                 </div>
               </div>
@@ -95,19 +107,20 @@ export default function App() {
 
         {activeTab === 'saved' && (
           <div className="max-w-2xl mx-auto w-full">
-            <SavedWords 
-              words={savedWords} 
-              onSelect={handleSelectWord} 
-              onRemove={deleteWord} 
+            <SavedWords
+              words={savedWords}
+              onSelect={handleSelectWord}
+              onRemove={deleteWord}
             />
           </div>
         )}
 
         {activeTab === 'history' && (
           <div className="max-w-2xl mx-auto w-full">
-            <HistoryList 
-              words={history} 
-              onSelect={handleSelectWord} 
+            <HistoryList
+              words={history}
+              onSelect={handleSelectWord}
+              onRemove={deleteWord}
             />
           </div>
         )}
