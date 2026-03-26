@@ -49,6 +49,30 @@ html, body, #root {
   --radius-lg: 8px;
   --radius-xl: 10px;
 
+  /* Tipografia — escala semântica */
+  --text-word-title: 42px;
+  --text-meaning: 17px;
+  --text-example: 13px;
+  --text-meta: 12px;
+  --text-label: 10px;
+
+  /* Letter spacing semântico */
+  --tracking-title: -0.5px;
+  --tracking-label: 1.2px;
+  --tracking-caps: 0.5px;
+  --tracking-badge: 0.6px;
+  --tracking-fine: 0.2px;
+
+  /* Line height */
+  --leading-comfortable: 1.55;
+
+  /* Cores adicionais */
+  --color-separator: #D3D1C7;
+  --color-status-error: #D85A30;
+
+  /* Heights */
+  --height-nav: 38px;
+
   /* Animations */
   --animate-word-enter: slideUp 0.2s ease;
   --animate-pulse-dots: pulse-dots 1.2s ease-in-out infinite;
@@ -120,25 +144,16 @@ body {
   border-radius: 2px;
 }
 
-/* Typography Roles */
-.section-label {
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--color-text-faint);
-  margin-bottom: 8px;
-}
-
-.divider {
-  height: 0.5px;
-  background: var(--color-border-subtle);
-  border: none;
-  margin: 0 0 16px;
-}
-
-/* Animation utilities for those not covered by @theme yet or for specific usage */
+/* Animation utilities */
 .word-card-enter {
   animation: var(--animate-word-enter);
+}
+
+.dot-delay-1 { animation-delay: 0.2s; }
+.dot-delay-2 { animation-delay: 0.4s; }
+
+/* Example text highlight */
+.example-en strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
 }

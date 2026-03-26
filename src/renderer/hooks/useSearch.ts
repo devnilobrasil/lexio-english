@@ -2,12 +2,14 @@
 import { useState } from 'react'
 import type { Word } from '../../types'
 import { fetchWordFromAI } from '../lib/ai'
+import { useLocale } from './useLocale'
 
 export function useSearch() {
   const [word, setWord] = useState<Word | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const { locale } = useLocale()
 
   const search = async (searchTerm: string) => {
     const trimmed = searchTerm.trim().toLowerCase()
@@ -18,25 +20,26 @@ export function useSearch() {
     setError(null)
 
     try {
-      // 1. Tenta buscar no DB local (Cache)
-      const localWord = await window.lexio.getWord(trimmed)
-      
+      // 1. Tenta cache local para este locale
+      const localWord = await window.lexio.getWord(trimmed, locale)
+
       if (localWord) {
         setWord(localWord)
         setLoading(false)
         return
       }
 
-      // 2. Se não existir, busca na IA (Claude ou Groq)
-      const aiResponse = await fetchWordFromAI(trimmed)
-      
-      // 3. Salva o resultado no DB para cache futuro
-      const savedWord = await window.lexio.saveWord(aiResponse)
-      
+      // 2. Busca na IA com o locale ativo
+      const aiResponse = await fetchWordFromAI(trimmed, locale)
+
+      // 3. Salva no DB com o locale
+      const savedWord = await window.lexio.saveWord(aiResponse, locale)
+
       setWord(savedWord)
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Ocorreu um erro ao buscar a palavra.'
       console.error('Search error:', err)
-      setError(err.message || 'Ocorreu um erro ao buscar a palavra.')
+      setError(message)
       setWord(null)
     } finally {
       setLoading(false)

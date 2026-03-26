@@ -12,13 +12,13 @@ export function TitleBar() {
         <button
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={() => window.lexio.minimizeWindow()}
-          className="w-[11px] h-[11px] rounded-full bg-window-min hover:bg-window-min-hover border-none cursor-pointer transition-colors"
+          className="w-2.75 h-2.75 rounded-full bg-window-min hover:bg-window-min-hover border-none cursor-pointer transition-colors"
           title="Minimizar"
         />
         <button
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={() => window.lexio.closeWindow()}
-          className="w-[11px] h-[11px] rounded-full bg-window-close hover:bg-window-close-hover border-none cursor-pointer transition-colors"
+          className="w-2.75 h-2.75 rounded-full bg-window-close hover:bg-window-close-hover border-none cursor-pointer transition-colors"
           title="Fechar"
         />
       </div>

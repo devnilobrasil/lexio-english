@@ -1,31 +1,26 @@
 // src/renderer/components/ExampleItem.tsx
 import React from 'react'
-
-interface Example {
-  en: string
-  pt: string
-}
+import type { WordExample } from '../../types'
 
 interface ExampleItemProps {
-  example: Example
+  example: WordExample
   word: string
 }
 
 export function ExampleItem({ example, word }: ExampleItemProps) {
-  // util: highlight da palavra no exemplo
-  function highlightWord(text: string, word: string): string {
-    const re = new RegExp(`\\b(${word}\\w*)\\b`, 'gi')
+  function highlightWord(text: string, target: string): string {
+    const re = new RegExp(`\\b(${target}\\w*)\\b`, 'gi')
     return text.replace(re, '<strong>$1</strong>')
   }
 
   return (
-    <div className="py-[10px] border-t border-border-muted first:border-t-0 first:pt-0">
+    <div className="py-2.5 border-t border-border-muted first:border-t-0 first:pt-0">
       <p
-        className="font-sans text-[13px] text-text-secondary leading-[1.55] mb-[3px] [&>strong]:font-semibold [&>strong]:text-text-primary"
+        className="example-en font-sans text-example text-text-secondary leading-comfortable mb-1"
         dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }}
       />
-      <p className="font-sans text-[12px] text-text-muted leading-[1.5]">
-        {example.pt}
+      <p className="font-sans text-meta text-text-muted leading-normal">
+        {example.translation}
       </p>
     </div>
   )
