@@ -43,6 +43,24 @@ export function useWords() {
     }
   }
 
+  const removeFromHistory = async (word: string) => {
+    try {
+      await window.lexio.removeFromHistory(word)
+      fetchHistory()
+    } catch (err) {
+      console.error('Failed to remove word from history:', err)
+    }
+  }
+
+  const unsaveWord = async (word: string) => {
+    try {
+      await window.lexio.unsaveWord(word)
+      fetchSaved()
+    } catch (err) {
+      console.error('Failed to unsave word:', err)
+    }
+  }
+
   return {
     savedWords,
     history,
@@ -50,5 +68,7 @@ export function useWords() {
     fetchSaved,
     fetchHistory,
     deleteWord,
+    removeFromHistory,
+    unsaveWord,
   }
 }

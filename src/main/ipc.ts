@@ -6,8 +6,10 @@ import * as db from './db'
 export function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('word:get',         (_, word: string, locale: Locale)  => db.getWord(word, locale))
   ipcMain.handle('word:save',        (_, data, locale: Locale)           => db.upsertWord(data, locale))
-  ipcMain.handle('word:toggleSaved', (_, word: string)                   => db.toggleSaved(word))
-  ipcMain.handle('word:delete',      (_, word: string)                   => db.deleteWord(word))
+  ipcMain.handle('word:toggleSaved',        (_, word: string) => db.toggleSaved(word))
+  ipcMain.handle('word:delete',             (_, word: string) => db.deleteWord(word))
+  ipcMain.handle('word:removeFromHistory',  (_, word: string) => db.removeFromHistory(word))
+  ipcMain.handle('word:unsave',             (_, word: string) => db.unsaveWord(word))
   ipcMain.handle('word:history',     (_, locale: Locale, limit = 30)    => db.getHistory(limit, locale))
   ipcMain.handle('word:saved',       (_, locale: Locale)                 => db.getSaved(locale))
 
