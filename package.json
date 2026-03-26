@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "dist-main/main/index.js",
   "scripts": {
+    "predev": "tsc -p tsconfig.main.json",
     "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && electron .\"",
     "dev:renderer": "vite",
     "build:renderer": "vite build",
