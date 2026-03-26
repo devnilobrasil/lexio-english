@@ -1,4 +1,5 @@
 /dist
+/dist-build
 /dist-main
 .gemini
 
@@ -41,5 +42,6 @@ node_modules/
 /playwright/.auth/
 .playwright-mcp
 
-#gemini
-#.gemini/
+#mcp
+.mcp.json
+.claude/settings.local.json

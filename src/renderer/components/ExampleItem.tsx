@@ -1,21 +1,30 @@
 // src/renderer/components/ExampleItem.tsx
 import React from 'react'
-import type { WordExample } from '../../types'
 
-interface ExampleItemProps {
-  example: WordExample
+interface Example {
+  en: string
+  pt: string
 }
 
-export function ExampleItem({ example }: ExampleItemProps) {
+interface ExampleItemProps {
+  example: Example
+  word: string
+}
+
+export function ExampleItem({ example, word }: ExampleItemProps) {
+  // util: highlight da palavra no exemplo
+  function highlightWord(text: string, word: string): string {
+    const re = new RegExp(`\\b(${word}\\w*)\\b`, 'gi')
+    return text.replace(re, '<strong>$1</strong>')
+  }
+
   return (
-    <div className="group space-y-1.5 p-3 rounded-xl border border-gray-100 hover:border-blue-100 hover:bg-blue-50/30 transition-all duration-300">
-      <div className="flex gap-2">
-        <div className="mt-1.5 w-1 h-1 rounded-full bg-blue-400 group-hover:scale-125 transition-transform shrink-0" />
-        <p className="text-[15px] text-gray-800 font-medium leading-relaxed">
-          {example.en}
-        </p>
-      </div>
-      <p className="pl-3 text-sm text-gray-500 italic leading-relaxed">
+    <div className="py-[10px] border-t border-border-muted first:border-t-0 first:pt-0">
+      <p
+        className="font-sans text-[13px] text-text-secondary leading-[1.55] mb-[3px] [&>strong]:font-semibold [&>strong]:text-text-primary"
+        dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }}
+      />
+      <p className="font-sans text-[12px] text-text-muted leading-[1.5]">
         {example.pt}
       </p>
     </div>
