@@ -13,6 +13,10 @@ const api: LexioAPI = {
   getSaved:       (locale)              => ipcRenderer.invoke('word:saved', locale),
   closeWindow:    ()                    => ipcRenderer.send('window:close'),
   minimizeWindow: ()                    => ipcRenderer.send('window:minimize'),
+  onUpdateAvailable:  (cb) => ipcRenderer.on('update:available',  (_, v) => cb(v)),
+  onUpdateProgress:   (cb) => ipcRenderer.on('update:progress',   (_, p) => cb(p)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update:downloaded', (_, v) => cb(v)),
+  installUpdate:      ()   => ipcRenderer.send('update:install-now'),
 }
 
 contextBridge.exposeInMainWorld('lexio', api)

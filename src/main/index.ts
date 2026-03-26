@@ -3,6 +3,7 @@ import path from 'path'
 import { registerIpcHandlers } from './ipc'
 import { registerShortcut } from './shortcut'
 import { createTray } from './tray'
+import { setupAutoUpdater } from './updater'
 import * as db from './db'
 
 const isDev = !app.isPackaged
@@ -38,6 +39,7 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     win.show()
+    setupAutoUpdater(win)
   })
   registerIpcHandlers(win)
   registerShortcut(win)
