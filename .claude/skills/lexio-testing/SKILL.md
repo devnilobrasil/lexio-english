@@ -1,6 +1,7 @@
 ---
 name: lexio-testing
 description: Padrões de teste E2E do Lexio com Playwright + Electron. Inclui como inicializar o Electron no teste, como mockar a Claude API para não gastar créditos, e estrutura de testes.
+context: fork
 ---
 
 # Lexio Testing Skill

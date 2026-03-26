@@ -45,3 +45,4 @@ node_modules/
 #mcp
 .mcp.json
 .claude/settings.local.json
+.claude/implementation_plan.md
