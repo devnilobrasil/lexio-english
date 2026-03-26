@@ -18,7 +18,7 @@ type View = 'search' | 'saved' | 'history'
 export default function App() {
   const [activeTab, setActiveTab] = useState<View>('search')
   const { word, loading, error, search, toggleSaved, query } = useSearch()
-  const { savedWords, history, fetchSaved, fetchHistory, deleteWord } = useWords()
+  const { savedWords, history, fetchSaved, fetchHistory, removeFromHistory, unsaveWord } = useWords()
   const { t } = useTranslation()
   const { locale } = useLocale()
   const prevLocaleRef = useRef(locale)
@@ -110,7 +110,7 @@ export default function App() {
             <SavedWords
               words={savedWords}
               onSelect={handleSelectWord}
-              onRemove={deleteWord}
+              onRemove={unsaveWord}
             />
           </div>
         )}
@@ -120,7 +120,7 @@ export default function App() {
             <HistoryList
               words={history}
               onSelect={handleSelectWord}
-              onRemove={deleteWord}
+              onRemove={removeFromHistory}
             />
           </div>
         )}
