@@ -15,21 +15,23 @@ files:
 # Windows configuration
 win:
   target: nsis
-  icon: public/icon.png
+  icon: src/assets/icon.ico
+  
 nsis:
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
+  shortcutName: Lexio
 
 # Mac configuration
 mac:
   target: dmg
-  icon: public/icon.png
+  icon: src/assets/icon.ico
   category: public.app-category.education
 
 # Linux configuration
 linux:
   target: AppImage
   category: Education
-  icon: public/icon.png
+  icon: src/assets/icon.ico

@@ -1,4 +1,3 @@
-// src/main/index.ts
 import { app, BrowserWindow, screen } from 'electron'
 import path from 'path'
 import { registerIpcHandlers } from './ipc'
@@ -17,10 +16,13 @@ function createWindow() {
     x: Math.round((sw - 720) / 2),
     y: Math.round((sh - 620) / 2),
     frame: false,
-    transparent: true,
+    hasShadow: true,
     resizable: true,
-    skipTaskbar: true,
+    transparent: false,
+    backgroundColor: '#F7F6F3',
+    skipTaskbar: false,
     show: false,
+    icon: path.join(__dirname, '../../public/logo/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -30,25 +32,22 @@ function createWindow() {
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
-    // win.webContents.openDevTools({ mode: 'detach' })
   } else {
     win.loadFile(path.join(__dirname, '../../dist/index.html'))
   }
 
-  win.on('blur', () => {
-    if (!isDev) win.hide()
-  })
-
-  registerIpcHandlers(win)
-  registerShortcut(win)
-  createTray(win)
-
   win.once('ready-to-show', () => {
     win.show()
   })
+  registerIpcHandlers(win)
+  registerShortcut(win)
+  createTray(win)
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.lexio.app')
+  }
   db.init()
   createWindow()
 })

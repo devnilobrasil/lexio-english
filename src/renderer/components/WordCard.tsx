@@ -11,34 +11,36 @@ interface WordCardProps {
 
 export function WordCard({ word, onToggleSaved, onSelectSynonym }: WordCardProps) {
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* Cabeçalho do Card */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-3">
-            <h2 className="text-4xl font-bold tracking-tight text-gray-900">{word.word}</h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-100/50 text-blue-700 text-[10px] font-bold uppercase tracking-wider">
-              {word.level}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-3 text-sm font-medium text-gray-500">
+    <div className="w-full max-w-2xl mx-auto word-card-enter">
+      {/* Word Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <h1 className="font-serif text-[42px] font-semibold text-text-primary leading-none mb-2 tracking-[-0.5px]">
+            {word.word}
+          </h1>
+          <div className="flex items-center gap-2.5">
             {word.phonetic && (
-              <span className="font-mono bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+              <span className="font-serif text-[13px] italic text-text-muted">
                 /{word.phonetic}/
               </span>
             )}
-            <span className="capitalize">{word.pos}</span>
+            <div className="w-0.5 h-0.5 rounded-full bg-[#D3D1C7]" />
+            <span className="font-sans text-xs text-text-muted">
+              {word.pos}
+            </span>
+            <div className="w-0.5 h-0.5 rounded-full bg-[#D3D1C7]" />
+            <span className="font-sans text-[10px] font-medium tracking-[0.6px] uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
+              {word.level}
+            </span>
           </div>
         </div>
-
+        
         <button
           onClick={onToggleSaved}
-          className={`group flex items-center justify-center w-12 h-12 rounded-2xl border transition-all duration-300 ${
-            word.is_saved 
-              ? 'bg-blue-600 border-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.3)]' 
-              : 'bg-white border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500'
+          className={`flex items-center gap-1.5 font-sans text-xs font-medium px-3 py-1.5 border rounded-md transition-colors mt-1.5 ${
+            word.is_saved
+              ? 'bg-accent-bg border-accent-text/30 text-accent-text'
+              : 'bg-transparent border-border-subtle text-text-muted hover:border-text-faint hover:text-text-secondary'
           }`}
         >
           <svg 
@@ -46,90 +48,65 @@ export function WordCard({ word, onToggleSaved, onSelectSynonym }: WordCardProps
             viewBox="0 0 24 24" 
             fill={word.is_saved ? "currentColor" : "none"} 
             stroke="currentColor" 
-            strokeWidth="2.5" 
+            strokeWidth="2" 
             strokeLinecap="round" 
             strokeLinejoin="round" 
-            className="w-5 h-5 group-active:scale-90 transition-transform"
+            className="w-3 h-3"
           >
-            <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
           </svg>
+          {word.is_saved ? 'Salvo' : 'Salvar'}
         </button>
-      </header>
+      </div>
 
-      {/* Significados */}
-      <section className="space-y-6">
-        <div className="space-y-2 p-5 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100/50 shadow-sm">
-          <h3 className="text-sm font-bold text-blue-600 uppercase tracking-widest">Significado</h3>
-          <p className="text-xl font-semibold text-gray-800 leading-snug">
-            {word.meaning_pt}
+      <hr className="divider" />
+
+      {/* Meaning Block */}
+      <div className="mb-5">
+        <p className="section-label">Significado</p>
+        <p className="font-serif text-meaning text-text-primary mb-2">
+          {word.meaning_pt}
+        </p>
+        {word.meaning_en && (
+          <p className="font-serif text-[13px] italic leading-relaxed text-text-muted mb-5">
+            {word.meaning_en}
           </p>
-          {word.meaning_en && (
-            <p className="text-gray-500 leading-relaxed">
-              {word.meaning_en}
-            </p>
-          )}
-        </div>
-
-        {/* Contextos / Badges */}
-        {word.contexts.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {word.contexts.map(ctx => (
-              <span 
-                key={ctx}
-                className="px-3 py-1 text-[11px] font-bold tracking-wide uppercase rounded-full bg-gray-100 text-gray-500 border border-gray-200"
-              >
-                {ctx}
-              </span>
-            ))}
-          </div>
         )}
-      </section>
+      </div>
 
-      {/* Exemplos */}
+      {/* Examples */}
       {word.examples.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-            Exemplos Práticos
-            <div className="flex-1 h-[1px] bg-gray-100" />
-          </h3>
-          <div className="space-y-3">
+        <div className="mb-5">
+          <p className="section-label">Exemplos</p>
+          <hr className="divider" />
+          <div className="flex flex-col gap-2">
             {word.examples.map((ex, i) => (
-              <ExampleItem key={i} example={ex} />
+              <ExampleItem key={i} example={ex} word={word.word} />
             ))}
           </div>
-        </section>
-      )}
-
-      {/* Sinônimos */}
-      {word.synonyms.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-            Sinônimos
-            <div className="flex-1 h-[1px] bg-gray-100" />
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {word.synonyms.map(syn => (
-              <button
-                key={syn}
-                onClick={() => onSelectSynonym?.(syn)}
-                className="px-4 py-1.5 rounded-xl border border-gray-100 bg-white text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm transition-all"
-              >
-                {syn}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Metadados / Footer do Card */}
-      <footer className="pt-8 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-        <div className="flex gap-4">
-          <span>Views: {word.view_count || 1}</span>
-          {word.last_viewed && (
-            <span>Última vez: {new Date(word.last_viewed).toLocaleDateString()}</span>
-          )}
         </div>
-      </footer>
+      )}
+
+      {/* Tags Section (Synonyms and Contexts) */}
+      <div className="flex gap-1.5 flex-wrap pt-5 border-t border-border-subtle">
+        {word.synonyms.map((syn) => (
+          <button
+            key={syn}
+            onClick={() => onSelectSynonym?.(syn)}
+            className="font-sans text-xs font-normal text-tag-text bg-tag-bg hover:bg-surface-hover hover:text-text-secondary border-none rounded-sm px-2.5 py-1 cursor-pointer transition-colors"
+          >
+            {syn}
+          </button>
+        ))}
+        {word.contexts.map((ctx) => (
+          <span 
+            key={ctx} 
+            className="font-sans text-xs font-medium text-accent-text bg-accent-bg rounded-sm px-2.5 py-1"
+          >
+            {ctx}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

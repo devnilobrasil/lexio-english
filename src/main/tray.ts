@@ -4,14 +4,12 @@ import path from 'path'
 import fs from 'fs'
 
 export function createTray(win: BrowserWindow): Tray {
-  // Tenta carregar o ícone oficial, se não existir usa um ícone vazio para não quebrar
-  const iconPath = path.join(__dirname, '../../public/icon.png')
+  const iconPath = path.join(__dirname, '../../public/logo/tray.ico')
   let icon
   
   if (fs.existsSync(iconPath)) {
-    icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    icon = nativeImage.createFromPath(iconPath)
   } else {
-    // Cria um ícone vazio (fallback)
     icon = nativeImage.createEmpty()
   }
 

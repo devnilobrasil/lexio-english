@@ -1,18 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@source "../**/*.{ts,tsx}";
+
+html, body, #root {
+  height: 100%;
+  background: transparent !important;  /* ← sem isto o fundo fica preto */
 }
 
+
 @theme {
-  --color-brand: #3b82f6;
+  --font-serif: "Lora", "Georgia", "serif";
+  --font-sans: "Inter", "system-ui", "sans-serif";
+
+  /* Cores - Superfícies */
+  --color-surface-base: #F7F6F3;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F0EEE9;
+  --color-surface-hover: #ECEAE4;
+
+  /* Cores - Bordas */
+  --color-border-subtle: #E2E0DA;
+  --color-border-muted: #ECEAE4;
+
+  /* Cores - Texto */
+  --color-text-primary: #1A1918;
+  --color-text-secondary: #2C2C2A;
+  --color-text-muted: #888780;
+  --color-text-faint: #B4B2A9;
+
+  /* Cores - Acento */
+  --color-accent-bg: #E6F1FB;
+  --color-accent-text: #0C447C;
+  --color-status-online: #639922;
+
+  /* Cores - Window Controls */
+  --color-window-close: #EC6A5E;
+  --color-window-close-hover: #D15A50;
+  --color-window-min: #61C454;
+  --color-window-min-hover: #52A946;
+
+  /* Cores - Tags */
+  --color-tag-bg: #ECEAE4;
+  --color-tag-text: #5F5E5A;
+
+  /* Raios */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  /* Animations */
+  --animate-word-enter: slideUp 0.2s ease;
+  --animate-pulse-dots: pulse-dots 1.2s ease-in-out infinite;
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse-dots {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50%       { opacity: 1;   transform: scale(1); }
+  }
+}
+
+/* Reset & Base */
+html, body, #root {
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+}
+
+html {
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   margin: 0;
-  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-surface-base);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#root {
+  animation: slideUp 120ms ease-out;
+}
+
+
+/* Layout Structure */
+.app-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-surface-base);
+  overflow: hidden;
+}
+
+.app-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 32px; /* Aumentado de 20px 24px */
+}
+
+/* Scrollbar discreta */
+.app-body::-webkit-scrollbar {
+  width: 4px;
+}
+.app-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app-body::-webkit-scrollbar-thumb {
+  background: #D3D1C7;
+  border-radius: 2px;
+}
+
+/* Typography Roles */
+.section-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-bottom: 8px;
+}
+
+.divider {
+  height: 0.5px;
+  background: var(--color-border-subtle);
+  border: none;
+  margin: 0 0 16px;
+}
+
+/* Animation utilities for those not covered by @theme yet or for specific usage */
+.word-card-enter {
+  animation: var(--animate-word-enter);
 }
