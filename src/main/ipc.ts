@@ -2,6 +2,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import type { Locale } from '../types'
 import * as db from './db'
+import { quitAndInstall } from './updater'
 
 export function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('word:get',         (_, word: string, locale: Locale)  => db.getWord(word, locale))
@@ -13,6 +14,7 @@ export function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('word:history',     (_, locale: Locale, limit = 30)    => db.getHistory(limit, locale))
   ipcMain.handle('word:saved',       (_, locale: Locale)                 => db.getSaved(locale))
 
-  ipcMain.on('window:close',    () => win.hide())
-  ipcMain.on('window:minimize', () => win.minimize())
+  ipcMain.on('window:close',      () => win.hide())
+  ipcMain.on('window:minimize',   () => win.minimize())
+  ipcMain.on('update:install-now', () => quitAndInstall())
 }

@@ -8,6 +8,7 @@ import { SavedWords } from './components/SavedWords'
 import { HistoryList } from './components/HistoryList'
 import { Nav } from './components/Nav'
 import { StatusBar } from './components/StatusBar'
+import { UpdateBanner } from './components/UpdateBanner'
 import { SectionLabel } from './components/SectionLabel'
 import { useSearch } from './hooks/useSearch'
 import { useWords } from './hooks/useWords'
@@ -126,6 +127,7 @@ export default function App() {
         )}
       </main>
 
+      <UpdateBanner />
       <StatusBar version="1.0.0" />
     </div>
   )
