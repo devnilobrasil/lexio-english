@@ -39,4 +39,4 @@ linux:
 publish:
   provider: github
   owner: devnilobrasil
-  repo: lexio
+  repo: lexio-english
