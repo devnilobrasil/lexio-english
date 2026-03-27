@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pretest": "npm rebuild better-sqlite3",
+    "posttest": "npm run rebuild:electron",
     "rebuild:electron": "npx electron-rebuild -f -w better-sqlite3",
     "publish:win": "npm run build -- --win --publish always"
   },

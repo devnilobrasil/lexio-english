@@ -20,7 +20,16 @@
     "save": "Salvar",
     "saved": "Salvo",
     "meaning": "Significado",
-    "examples": "Exemplos"
+    "meaningEn": "Em inglês",
+    "examples": "Exemplos",
+    "verbForms": "Formas verbais",
+    "antonyms": "Antônimos",
+    "tip": "Dica",
+    "verbInfinitive": "Infinitivo",
+    "verbPast": "Passado simples",
+    "verbPastParticiple": "Particípio passado",
+    "verbPresentParticiple": "Gerúndio",
+    "verbThirdPerson": "3ª pessoa"
   },
   "level": {
     "Basic": "Básico",

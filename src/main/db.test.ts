@@ -17,10 +17,14 @@ function makeWord(word: string, overrides: Partial<AIWordResponse> = {}): AIWord
     phonetic: `/${word}/`,
     pos: 'noun',
     level: 'Basic',
+    verb_forms: null,
+    meaning_en: '',
     synonyms: ['syn1', 'syn2'],
+    antonyms: [],
     contexts: ['ctx1'],
     meaning: `Meaning of ${word}`,
     examples: [{ en: `${word} example.`, translation: `Exemplo de ${word}.` }],
+    tip: '',
     ...overrides,
   }
 }
@@ -200,6 +204,137 @@ describe('removeFromHistory', () => {
     db.removeFromHistory('ethereal')
     const saved = db.getSaved(LOCALE)
     expect(saved.some(w => w.word === 'ethereal')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Novos campos: verb_forms, meaning_en, antonyms, tip
+// ---------------------------------------------------------------------------
+describe('novos campos — persistência', () => {
+  afterEach(() => { try { db.deleteWord('scrutinize') } catch { /* no-op */ } })
+
+  const VERB_FORMS = {
+    infinitive: 'to scrutinize',
+    past: 'scrutinized',
+    past_participle: 'scrutinized',
+    present_participle: 'scrutinizing',
+    third_person: 'scrutinizes',
+  }
+
+  it('salva e recupera verb_forms como JSON', () => {
+    db.upsertWord(makeWord('scrutinize', { pos: 'verb', verb_forms: VERB_FORMS }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.verb_forms).toEqual(VERB_FORMS)
+  })
+
+  it('salva verb_forms null para não-verbos', () => {
+    db.upsertWord(makeWord('scrutinize', { pos: 'noun', verb_forms: null }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.verb_forms).toBeNull()
+  })
+
+  it('salva e recupera meaning_en', () => {
+    db.upsertWord(makeWord('scrutinize', { meaning_en: 'To examine closely and critically.' }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.meaning_en).toBe('To examine closely and critically.')
+  })
+
+  it('salva e recupera antonyms como JSON', () => {
+    db.upsertWord(makeWord('scrutinize', { antonyms: ['ignore', 'overlook'] }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.antonyms).toEqual(['ignore', 'overlook'])
+  })
+
+  it('retorna array vazio para antonyms quando não fornecido', () => {
+    db.upsertWord(makeWord('scrutinize', { antonyms: [] }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.antonyms).toEqual([])
+  })
+
+  it('salva e recupera tip em word_translations', () => {
+    db.upsertWord(makeWord('scrutinize', { tip: 'Não confunda com "scan".' }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.translation.tip).toBe('Não confunda com "scan".')
+  })
+
+  it('tip é locale-específico', () => {
+    db.upsertWord(makeWord('scrutinize', { tip: 'Dica em PT' }), 'pt-BR')
+    db.upsertWord(makeWord('scrutinize', { tip: 'Consejo en ES' }), 'es')
+    expect(db.getWord('scrutinize', 'pt-BR')!.translation.tip).toBe('Dica em PT')
+    expect(db.getWord('scrutinize', 'es')!.translation.tip).toBe('Consejo en ES')
+  })
+
+  it('upsert atualiza os novos campos ao fazer conflito', () => {
+    db.upsertWord(makeWord('scrutinize', { meaning_en: 'Original', antonyms: ['a'] }), LOCALE)
+    db.upsertWord(makeWord('scrutinize', { meaning_en: 'Updated', antonyms: ['b', 'c'] }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.meaning_en).toBe('Updated')
+    expect(result.antonyms).toEqual(['b', 'c'])
+  })
+
+  it('upsert atualiza tip ao fazer conflito', () => {
+    db.upsertWord(makeWord('scrutinize', { tip: 'Dica original' }), LOCALE)
+    db.upsertWord(makeWord('scrutinize', { tip: 'Dica atualizada' }), LOCALE)
+    const result = db.getWord('scrutinize', LOCALE)!
+    expect(result.translation.tip).toBe('Dica atualizada')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Novos campos — getHistory e getSaved incluem tip via JOIN
+// ---------------------------------------------------------------------------
+describe('novos campos — listas (getHistory / getSaved)', () => {
+  afterEach(() => { try { db.deleteWord('ephemeral') } catch { /* no-op */ } })
+
+  it('getHistory retorna tip corretamente via JOIN', () => {
+    db.upsertWord(makeWord('ephemeral', { tip: 'Dica histórico' }), LOCALE)
+    const history = db.getHistory(50, LOCALE)
+    const found = history.find(w => w.word === 'ephemeral')
+    expect(found).toBeDefined()
+    expect(found!.translation.tip).toBe('Dica histórico')
+  })
+
+  it('getSaved retorna tip corretamente via JOIN', () => {
+    db.upsertWord(makeWord('ephemeral', { tip: 'Dica salvo' }), LOCALE)
+    db.toggleSaved('ephemeral')
+    const saved = db.getSaved(LOCALE)
+    const found = saved.find(w => w.word === 'ephemeral')
+    expect(found).toBeDefined()
+    expect(found!.translation.tip).toBe('Dica salvo')
+  })
+
+  it('getHistory retorna antonyms corretamente', () => {
+    db.upsertWord(makeWord('ephemeral', { antonyms: ['permanent', 'eternal'] }), LOCALE)
+    const history = db.getHistory(50, LOCALE)
+    const found = history.find(w => w.word === 'ephemeral')
+    expect(found!.antonyms).toEqual(['permanent', 'eternal'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Compatibilidade retroativa — campos novos ausentes retornam defaults seguros
+// ---------------------------------------------------------------------------
+describe('compatibilidade retroativa — defaults seguros', () => {
+  afterEach(() => { try { db.deleteWord('legacy') } catch { /* no-op */ } })
+
+  it('retorna null para verb_forms ausente', () => {
+    db.upsertWord(makeWord('legacy', { verb_forms: null }), LOCALE)
+    expect(db.getWord('legacy', LOCALE)!.verb_forms).toBeNull()
+  })
+
+  it('retorna string vazia para meaning_en ausente', () => {
+    db.upsertWord(makeWord('legacy', { meaning_en: '' }), LOCALE)
+    expect(db.getWord('legacy', LOCALE)!.meaning_en).toBe('')
+  })
+
+  it('retorna array vazio para antonyms ausente', () => {
+    db.upsertWord(makeWord('legacy', { antonyms: [] }), LOCALE)
+    expect(db.getWord('legacy', LOCALE)!.antonyms).toEqual([])
+  })
+
+  it('retorna string vazia para tip ausente', () => {
+    db.upsertWord(makeWord('legacy', { tip: '' }), LOCALE)
+    expect(db.getWord('legacy', LOCALE)!.translation.tip).toBe('')
   })
 })
 

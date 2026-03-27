@@ -1,33 +1,76 @@
 // src/renderer/lib/ai.ts
 import type { AIWordResponse, Locale } from '../../types'
 
-const SYSTEM_PROMPT = `You are an English dictionary specialized for language learners.
-Respond ONLY with valid JSON, no markdown, no extra text.`
+const SYSTEM_PROMPT = `You are an expert English lexicographer and language teacher specialized in helping non-native speakers truly understand and retain English vocabulary.
+
+Your responses must follow these quality standards:
+- Phonetic transcription must be accurate IPA notation
+- Meanings must be clear, natural, and written as a native speaker of the target language would explain it — not a literal translation
+- Examples must be real-world, practical sentences that reflect how the word is actually used today — avoid generic or overly simple sentences
+- For verbs, at least one example must show the word in a natural conversational or professional context
+- Synonyms must be genuinely interchangeable in at least one common context
+- Level assessment: Basic (A1-A2), Intermediate (B1-B2), Advanced (C1-C2), Technical (domain-specific jargon)
+- Respond ONLY with valid JSON, no markdown, no extra text, no explanations`
+
+const LOCALE_NAMES: Record<Locale, string> = {
+  'pt-BR': 'Brazilian Portuguese',
+  'es': 'Spanish',
+}
 
 const LOCALE_INSTRUCTIONS: Record<Locale, string> = {
-  'pt-BR': 'Provide the meaning and example translations in Brazilian Portuguese.',
-  'en':    'Provide the meaning and example translations in English.',
-  'es':    'Provide the meaning and example translations in Spanish.',
+  'pt-BR': `- "meaning" must be written in natural Brazilian Portuguese, as a Brazilian would explain it to a friend — not a dictionary translation
+- "translation" in examples must sound natural in Brazilian Portuguese, not word-for-word
+- "tip" must be written in Brazilian Portuguese
+- Use Brazilian vocabulary and expressions, not European Portuguese`,
+  'es': `- "meaning" must be written in natural Spanish, as a native speaker would explain it to a friend
+- "translation" in examples must sound natural in Spanish, not word-for-word
+- "tip" must be written in Spanish`,
 }
 
 const buildUserPrompt = (word: string, locale: Locale): string => `
-For the English word "${word}", return exactly this JSON:
+For the English word "${word}", return exactly this JSON structure with no deviations:
+
 {
   "word": "${word}",
-  "phonetic": "IPA transcription, e.g. tʃɜːrn",
-  "pos": "verb|noun|adjective|adverb|phrase|idiom",
-  "level": "Basic|Intermediate|Advanced|Technical",
-  "meaning": "definition in the target language",
+  "phonetic": "accurate IPA transcription",
+  "pos": "one of: verb | noun | adjective | adverb | phrase | idiom | conjunction | preposition",
+  "verb_forms": {
+    "infinitive": "to ${word}",
+    "past": "past tense form",
+    "past_participle": "past participle form",
+    "present_participle": "present participle form",
+    "third_person": "third person singular present"
+  },
+  "level": "one of: Basic | Intermediate | Advanced | Technical",
+  "meaning": "clear and natural explanation in ${LOCALE_NAMES[locale]} — explain it like a knowledgeable friend would, not a dictionary",
+  "meaning_en": "concise English definition in plain language, 1 sentence max",
   "examples": [
-    {"en": "example sentence in English", "translation": "translation"},
-    {"en": "second example",              "translation": "translation"},
-    {"en": "third example",               "translation": "translation"}
+    {
+      "en": "natural, real-world sentence showing the word in a professional or everyday context",
+      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
+    },
+    {
+      "en": "sentence showing the word in a different context or grammatical structure than example 1",
+      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
+    },
+    {
+      "en": "sentence that could appear in a book, article, podcast, or real conversation",
+      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
+    }
   ],
-  "synonyms": ["word1", "word2", "word3"],
-  "contexts": ["Business", "Technology"]
+  "synonyms": ["3 to 5 genuinely interchangeable synonyms in common contexts"],
+  "antonyms": ["1 to 3 antonyms if applicable, empty array if none"],
+  "contexts": ["1 to 3 contexts where this word is most commonly used"],
+  "tip": "one practical memorization tip or common mistake to avoid, written in ${LOCALE_NAMES[locale]}"
 }
-${LOCALE_INSTRUCTIONS[locale]}
-Possible contexts: Business, Technology, Informal, Formal, Finance, Marketing, HR, Legal, Medicine, Slang`
+
+Rules:
+- If the word is NOT a verb, set "verb_forms" to null
+- The three examples must show different usages or sentence structures — do not repeat the same pattern
+- "contexts" must be chosen from: Business, Technology, Informal, Formal, Finance, Marketing, HR, Legal, Medicine, Slang, Academic, Literature, Sports, Travel
+- "tip" should mention a common mistake learners make OR a trick to remember the word OR a nuance that distinguishes it from similar words
+
+${LOCALE_INSTRUCTIONS[locale]}`
 
 export async function fetchWordFromGroq(word: string, locale: Locale): Promise<AIWordResponse> {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY as string
@@ -56,7 +99,7 @@ export async function fetchWordFromGroq(word: string, locale: Locale): Promise<A
   return parseAIResponse(text)
 }
 
-function parseAIResponse(text: string): AIWordResponse {
+export function parseAIResponse(text: string): AIWordResponse {
   try {
     const clean = text.replace(/```json|```/g, '').trim()
     return JSON.parse(clean) as AIWordResponse

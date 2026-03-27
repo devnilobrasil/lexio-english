@@ -68,8 +68,49 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
         <p className="font-serif text-meaning text-text-primary mb-2">
           {word.translation.meaning}
         </p>
+        {word.meaning_en && (
+          <p className="font-sans text-meta italic text-text-muted">
+            {word.meaning_en}
+          </p>
+        )}
       </div>
-      
+
+      {/* Verb Forms */}
+      {word.pos === 'verb' && word.verb_forms && (
+        <div className="mb-5">
+          <SectionLabel>{t('word.verbForms')}</SectionLabel>
+          <div className="grid grid-cols-5 gap-x-3 gap-y-1">
+            {(
+              [
+                ['verbInfinitive',        word.verb_forms.infinitive],
+                ['verbPast',              word.verb_forms.past],
+                ['verbPastParticiple',    word.verb_forms.past_participle],
+                ['verbPresentParticiple', word.verb_forms.present_participle],
+                ['verbThirdPerson',       word.verb_forms.third_person],
+              ] as [string, string][]
+            ).map(([key, value]) => (
+              <div key={key} className="flex flex-col gap-0.5">
+                <span className="font-sans text-label text-text-muted uppercase tracking-badge">
+                  {t(`word.${key}`)}
+                </span>
+                <span className="font-serif text-meta text-text-secondary">
+                  {value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tip */}
+      {word.translation.tip && (
+        <div className="mb-1">
+          <SectionLabel>{t('word.tip')}</SectionLabel>
+          <p className="font-sans text-meta italic text-text-muted">
+            {word.translation.tip}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

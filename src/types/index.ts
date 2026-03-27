@@ -7,13 +7,23 @@ export interface WordExample {
   translation: string  // locale-aware (era "pt")
 }
 
+export interface VerbForms {
+  infinitive: string
+  past: string
+  past_participle: string
+  present_participle: string
+  third_person: string
+}
+
 export interface WordTranslation {
   locale: Locale
   meaning: string
   examples: WordExample[]
+  tip: string
 }
 
-export type PartOfSpeech = 'verb' | 'noun' | 'adjective' | 'adverb' | 'phrase' | 'idiom'
+export type PartOfSpeech =
+  'verb' | 'noun' | 'adjective' | 'adverb' | 'phrase' | 'idiom' | 'conjunction' | 'preposition'
 export type WordLevel = 'Basic' | 'Intermediate' | 'Advanced' | 'Technical'
 
 export interface Word {
@@ -22,7 +32,10 @@ export interface Word {
   phonetic: string | null
   pos: PartOfSpeech | null
   level: WordLevel | null
+  verb_forms: VerbForms | null
+  meaning_en: string
   synonyms: string[]
+  antonyms: string[]
   contexts: string[]
   translation: WordTranslation  // tradução do locale ativo
   created_at?: string
@@ -37,10 +50,14 @@ export interface AIWordResponse {
   phonetic: string | null
   pos: PartOfSpeech | null
   level: WordLevel | null
+  verb_forms: VerbForms | null
+  meaning_en: string
   synonyms: string[]
+  antonyms: string[]
   contexts: string[]
   meaning: string
   examples: WordExample[]
+  tip: string
 }
 
 // API IPC exposta ao renderer via contextBridge
