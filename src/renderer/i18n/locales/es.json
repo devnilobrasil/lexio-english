@@ -4,6 +4,13 @@
     "saved": "Guardados",
     "history": "Historial"
   },
+  "sidebar": {
+    "definition": "Definición",
+    "examples": "Ejemplos",
+    "synonyms": "Sinónimos",
+    "saved": "Guardados",
+    "history": "Historial"
+  },
   "search": {
     "placeholder": "Busca una palabra en inglés...",
     "recent": "Búsquedas recientes",

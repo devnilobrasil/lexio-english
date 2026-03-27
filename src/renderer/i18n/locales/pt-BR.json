@@ -4,6 +4,13 @@
     "saved": "Salvos",
     "history": "Histórico"
   },
+  "sidebar": {
+    "definition": "Definição",
+    "examples": "Exemplos",
+    "synonyms": "Sinônimos",
+    "saved": "Salvos",
+    "history": "Histórico"
+  },
   "search": {
     "placeholder": "Busque uma palavra em inglês...",
     "recent": "Histórico recente",

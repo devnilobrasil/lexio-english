@@ -1,22 +1,20 @@
-// src/renderer/components/WordCard.tsx
+// src/renderer/components/DefinitionView.tsx
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
-import { ExampleItem } from './ExampleItem'
 import { SectionLabel } from './SectionLabel'
-import { Divider } from './Divider'
 
-interface WordCardProps {
+interface DefinitionViewProps {
   word: Word
   onToggleSaved: () => void
-  onSelectSynonym?: (synonym: string) => void
+  onSelectSynonym: (synonym: string) => void
 }
 
-export function WordCard({ word, onToggleSaved, onSelectSynonym }: WordCardProps) {
+export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: DefinitionViewProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="w-full max-w-2xl mx-auto word-card-enter">
+    <div className="word-card-enter">
       {/* Word Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -42,7 +40,7 @@ export function WordCard({ word, onToggleSaved, onSelectSynonym }: WordCardProps
 
         <button
           onClick={onToggleSaved}
-          className={`flex items-center gap-1.5 font-sans text-xs font-medium px-3 py-1.5 border rounded-md transition-colors mt-1.5 ${
+          className={`flex cursor-pointer items-center gap-1.5 font-sans text-xs font-medium px-3 py-1.5 border rounded-md transition-colors mt-1.5 ${
             word.is_saved
               ? 'bg-accent-bg border-accent-text/30 text-accent-text'
               : 'bg-transparent border-border-subtle text-text-muted hover:border-text-faint hover:text-text-secondary'
@@ -64,49 +62,14 @@ export function WordCard({ word, onToggleSaved, onSelectSynonym }: WordCardProps
         </button>
       </div>
 
-      <Divider />
-
-      {/* Meaning Block */}
+      {/* Meaning */}
       <div className="mb-5">
         <SectionLabel>{t('word.meaning')}</SectionLabel>
         <p className="font-serif text-meaning text-text-primary mb-2">
           {word.translation.meaning}
         </p>
       </div>
-
-      {/* Examples */}
-      {word.translation.examples.length > 0 && (
-        <div className="mb-5">
-          <SectionLabel>{t('word.examples')}</SectionLabel>
-          <Divider />
-          <div className="flex flex-col gap-2">
-            {word.translation.examples.map((ex, i) => (
-              <ExampleItem key={i} example={ex} word={word.word} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tags Section (Synonyms and Contexts) */}
-      <div className="flex gap-1.5 flex-wrap pt-5 border-t border-border-subtle">
-        {word.synonyms.map((syn) => (
-          <button
-            key={syn}
-            onClick={() => onSelectSynonym?.(syn)}
-            className="font-sans text-xs font-normal text-tag-text bg-tag-bg hover:bg-surface-hover hover:text-text-secondary border-none rounded-sm px-2.5 py-1 cursor-pointer transition-colors"
-          >
-            {syn}
-          </button>
-        ))}
-        {word.contexts.map((ctx) => (
-          <span
-            key={ctx}
-            className="font-sans text-xs font-medium text-accent-text bg-accent-bg rounded-sm px-2.5 py-1"
-          >
-            {ctx}
-          </span>
-        ))}
-      </div>
+      
     </div>
   )
 }

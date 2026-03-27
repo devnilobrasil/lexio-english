@@ -9,18 +9,20 @@ import * as db from './db'
 const isDev = !app.isPackaged
 
 function createWindow() {
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  const cursor = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursor)
+  const { width: sw, height: sh } = display.workAreaSize
+  const { x: dx, y: dy } = display.workArea
 
   const win = new BrowserWindow({
-    width: 720,
-    height: 620,
-    x: Math.round((sw - 720) / 2),
-    y: Math.round((sh - 620) / 2),
+    width: 600,
+    height: 60,
+    x: dx + Math.round((sw - 600) / 2),
+    y: dy + Math.round(sh * 0.25),
     frame: false,
     hasShadow: true,
-    resizable: true,
-    transparent: false,
-    backgroundColor: '#F7F6F3',
+    resizable: false,
+    transparent: true,
     skipTaskbar: false,
     show: false,
     icon: path.join(__dirname, '../../public/logo/icon.ico'),
