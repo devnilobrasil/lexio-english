@@ -55,6 +55,7 @@ export interface LexioAPI {
   getSaved:       (locale: Locale)                        => Promise<Word[]>
   closeWindow:    ()                                      => void
   minimizeWindow: ()                                      => void
+  resizeWindow:   (state: 'idle' | 'result')              => void
   onUpdateAvailable:  (cb: (version: string) => void) => void
   onUpdateProgress:   (cb: (pct: number) => void)     => void
   onUpdateDownloaded: (cb: (version: string) => void) => void

@@ -16,5 +16,9 @@ export function registerIpcHandlers(win: BrowserWindow): void {
 
   ipcMain.on('window:close',      () => win.hide())
   ipcMain.on('window:minimize',   () => win.minimize())
+  ipcMain.on('window:resize',     (_e, state: 'idle' | 'result') => {
+    const height = state === 'idle' ? 60 : 420
+    win.setSize(600, height, true)
+  })
   ipcMain.on('update:install-now', () => quitAndInstall())
 }
