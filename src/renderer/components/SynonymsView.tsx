@@ -12,9 +12,10 @@ interface SynonymsViewProps {
 export function SynonymsView({ word, onSelect }: SynonymsViewProps) {
   const { t } = useTranslation()
   const hasSynonyms = word.synonyms.length > 0
+  const hasAntonyms = word.antonyms.length > 0
   const hasContexts = word.contexts.length > 0
 
-  if (!hasSynonyms && !hasContexts) {
+  if (!hasSynonyms && !hasAntonyms && !hasContexts) {
     return (
       <div className="py-10 text-center">
         <p className="font-sans text-meta text-text-faint italic">
@@ -37,6 +38,23 @@ export function SynonymsView({ word, onSelect }: SynonymsViewProps) {
               >
                 {ctx}
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasAntonyms && (
+        <div className="mb-5">
+          <SectionLabel>{t('word.antonyms')}</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            {word.antonyms.map((ant) => (
+              <button
+                key={ant}
+                onClick={() => onSelect(ant)}
+                className="font-sans text-xs font-normal text-status-error bg-surface-sunken hover:bg-surface-hover border-none rounded-sm px-2.5 py-1 cursor-pointer transition-colors"
+              >
+                {ant}
+              </button>
             ))}
           </div>
         </div>

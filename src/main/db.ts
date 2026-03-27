@@ -11,7 +11,10 @@ interface WordRow {
   phonetic: string | null
   pos: string | null
   level: string | null
+  verb_forms: string | null
+  meaning_en: string | null
   synonyms: string
+  antonyms: string
   contexts: string
   created_at: string
   last_viewed: string
@@ -21,6 +24,7 @@ interface WordRow {
   meaning: string | null
   trans_examples: string | null
   trans_locale: string | null
+  trans_tip: string | null
 }
 
 let db: Database.Database
@@ -66,6 +70,20 @@ export function init(): void {
   if (!allCols.some(c => c.name === 'in_history')) {
     db.exec(`ALTER TABLE words ADD COLUMN in_history INTEGER DEFAULT 1`)
   }
+  if (!allCols.some(c => c.name === 'verb_forms')) {
+    db.exec(`ALTER TABLE words ADD COLUMN verb_forms TEXT`)
+  }
+  if (!allCols.some(c => c.name === 'meaning_en')) {
+    db.exec(`ALTER TABLE words ADD COLUMN meaning_en TEXT`)
+  }
+  if (!allCols.some(c => c.name === 'antonyms')) {
+    db.exec(`ALTER TABLE words ADD COLUMN antonyms TEXT DEFAULT '[]'`)
+  }
+
+  const transCols = db.pragma('table_info(word_translations)') as { name: string }[]
+  if (!transCols.some(c => c.name === 'tip')) {
+    db.exec(`ALTER TABLE word_translations ADD COLUMN tip TEXT`)
+  }
 
   // Migração: mover meaning_pt / meaning_en / examples para word_translations
   const cols = allCols
@@ -90,7 +108,7 @@ export function init(): void {
 
 export function getWord(word: string, locale: Locale): Word | null {
   const row = db.prepare(`
-    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale, wt.tip AS trans_tip
     FROM words w
     LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
     WHERE w.word = ? COLLATE NOCASE
@@ -107,36 +125,44 @@ export function getWord(word: string, locale: Locale): Word | null {
 
 export function upsertWord(data: AIWordResponse, locale: Locale): Word {
   db.prepare(`
-    INSERT INTO words (word, phonetic, pos, level, synonyms, contexts)
-    VALUES (@word, @phonetic, @pos, @level, @synonyms, @contexts)
+    INSERT INTO words (word, phonetic, pos, level, verb_forms, meaning_en, synonyms, antonyms, contexts)
+    VALUES (@word, @phonetic, @pos, @level, @verb_forms, @meaning_en, @synonyms, @antonyms, @contexts)
     ON CONFLICT(word) DO UPDATE SET
       phonetic    = excluded.phonetic,
       pos         = excluded.pos,
       level       = excluded.level,
+      verb_forms  = excluded.verb_forms,
+      meaning_en  = excluded.meaning_en,
       synonyms    = excluded.synonyms,
+      antonyms    = excluded.antonyms,
       contexts    = excluded.contexts,
       last_viewed = datetime('now'),
       view_count  = view_count + 1
   `).run({
-    word:     data.word,
-    phonetic: data.phonetic,
-    pos:      data.pos,
-    level:    data.level,
-    synonyms: JSON.stringify(data.synonyms ?? []),
-    contexts: JSON.stringify(data.contexts ?? []),
+    word:       data.word,
+    phonetic:   data.phonetic,
+    pos:        data.pos,
+    level:      data.level,
+    verb_forms: data.verb_forms ? JSON.stringify(data.verb_forms) : null,
+    meaning_en: data.meaning_en ?? '',
+    synonyms:   JSON.stringify(data.synonyms ?? []),
+    antonyms:   JSON.stringify(data.antonyms ?? []),
+    contexts:   JSON.stringify(data.contexts ?? []),
   })
 
   db.prepare(`
-    INSERT INTO word_translations (word, locale, meaning, examples)
-    VALUES (@word, @locale, @meaning, @examples)
+    INSERT INTO word_translations (word, locale, meaning, examples, tip)
+    VALUES (@word, @locale, @meaning, @examples, @tip)
     ON CONFLICT(word, locale) DO UPDATE SET
       meaning  = excluded.meaning,
-      examples = excluded.examples
+      examples = excluded.examples,
+      tip      = excluded.tip
   `).run({
     word:     data.word,
     locale,
     meaning:  data.meaning,
     examples: JSON.stringify(data.examples ?? []),
+    tip:      data.tip ?? '',
   })
 
   return getWord(data.word, locale)!
@@ -150,7 +176,7 @@ export function toggleSaved(word: string): Word {
 
   // Busca com qualquer tradução disponível
   const row = db.prepare(`
-    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale, wt.tip AS trans_tip
     FROM words w
     LEFT JOIN word_translations wt ON wt.word = w.word
     WHERE w.word = ?
@@ -177,7 +203,7 @@ export function getHistory(limit = 30, locale: Locale): Word[] {
   const safeLimit = Math.max(1, Math.floor(Number(limit) || 30))
   return (
     db.prepare(`
-      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale, wt.tip AS trans_tip
       FROM words w
       LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
       WHERE w.in_history = 1
@@ -189,7 +215,7 @@ export function getHistory(limit = 30, locale: Locale): Word[] {
 export function getSaved(locale: Locale): Word[] {
   return (
     db.prepare(`
-      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale, wt.tip AS trans_tip
       FROM words w
       LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
       WHERE w.is_saved = 1
@@ -205,12 +231,16 @@ function deserialize(row: WordRow): Word {
     phonetic:   row.phonetic,
     pos:        row.pos as PartOfSpeech | null,
     level:      row.level as WordLevel | null,
+    verb_forms: row.verb_forms ? JSON.parse(row.verb_forms) : null,
+    meaning_en: row.meaning_en ?? '',
     synonyms:   JSON.parse(row.synonyms ?? '[]'),
+    antonyms:   JSON.parse(row.antonyms ?? '[]'),
     contexts:   JSON.parse(row.contexts ?? '[]'),
     translation: {
       locale:   (row.trans_locale ?? 'pt-BR') as Locale,
       meaning:  row.meaning ?? '',
       examples: JSON.parse(row.trans_examples ?? '[]'),
+      tip:      row.trans_tip ?? '',
     },
     created_at:  row.created_at,
     last_viewed: row.last_viewed,
