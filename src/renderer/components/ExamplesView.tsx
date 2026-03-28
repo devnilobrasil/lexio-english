@@ -11,8 +11,9 @@ interface ExamplesViewProps {
 
 export function ExamplesView({ word }: ExamplesViewProps) {
   const { t } = useTranslation()
+  const allExamples = word.meanings.flatMap(m => m.examples)
 
-  if (word.translation.examples.length === 0) {
+  if (allExamples.length === 0) {
     return (
       <div className="py-10 text-center">
         <p className="font-sans text-meta text-text-faint italic">
@@ -26,7 +27,7 @@ export function ExamplesView({ word }: ExamplesViewProps) {
     <div className="word-card-enter">
       <SectionLabel>{t('word.examples')}</SectionLabel>
       <div className="flex flex-col gap-1">
-        {word.translation.examples.map((ex, i) => (
+        {allExamples.map((ex, i) => (
           <ExampleItem key={i} example={ex} word={word.word} />
         ))}
       </div>
