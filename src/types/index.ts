@@ -15,11 +15,12 @@ export interface VerbForms {
   third_person: string
 }
 
-export interface WordTranslation {
-  locale: Locale
+export interface MeaningEntry {
+  context: string
+  meaning_en: string
+  meaning_short: string
   meaning: string
   examples: WordExample[]
-  tip: string
 }
 
 export type PartOfSpeech =
@@ -33,11 +34,10 @@ export interface Word {
   pos: PartOfSpeech | null
   level: WordLevel | null
   verb_forms: VerbForms | null
-  meaning_en: string
+  meanings: MeaningEntry[]
   synonyms: string[]
   antonyms: string[]
   contexts: string[]
-  translation: WordTranslation  // tradução do locale ativo
   created_at?: string
   last_viewed?: string
   view_count?: number
@@ -51,13 +51,10 @@ export interface AIWordResponse {
   pos: PartOfSpeech | null
   level: WordLevel | null
   verb_forms: VerbForms | null
-  meaning_en: string
+  meanings: MeaningEntry[]
   synonyms: string[]
   antonyms: string[]
   contexts: string[]
-  meaning: string
-  examples: WordExample[]
-  tip: string
 }
 
 // API IPC exposta ao renderer via contextBridge

@@ -18,13 +18,18 @@ function makeWord(word: string, overrides: Partial<AIWordResponse> = {}): AIWord
     pos: 'noun',
     level: 'Basic',
     verb_forms: null,
-    meaning_en: '',
+    meanings: [
+      {
+        context: 'General',
+        meaning_en: `English meaning of ${word}`,
+        meaning_short: `Short meaning of ${word}`,
+        meaning: `Meaning of ${word}`,
+        examples: [{ en: `${word} example.`, translation: `Exemplo de ${word}.` }],
+      },
+    ],
     synonyms: ['syn1', 'syn2'],
     antonyms: [],
     contexts: ['ctx1'],
-    meaning: `Meaning of ${word}`,
-    examples: [{ en: `${word} example.`, translation: `Exemplo de ${word}.` }],
-    tip: '',
     ...overrides,
   }
 }
@@ -48,9 +53,9 @@ describe('getWord', () => {
     const result = db.getWord('serendipity', LOCALE)
     expect(result).not.toBeNull()
     expect(result!.word).toBe('serendipity')
-    expect(result!.translation.meaning).toBe('Meaning of serendipity')
+    expect(result!.meanings[0].meaning).toBe('Meaning of serendipity')
     expect(result!.synonyms).toEqual(['syn1', 'syn2'])
-    expect(result!.translation.examples).toHaveLength(1)
+    expect(result!.meanings[0].examples).toHaveLength(1)
   })
 
   it('increments view_count on each call', () => {
@@ -77,21 +82,23 @@ describe('upsertWord', () => {
     expect(word.word).toBe('ponder')
     expect(word.synonyms).toEqual(['syn1', 'syn2'])
     expect(word.contexts).toEqual(['ctx1'])
-    expect(word.translation.locale).toBe(LOCALE)
-    expect(word.translation.examples).toHaveLength(1)
+    expect(word.meanings).toHaveLength(1)
+    expect(word.meanings[0].examples).toHaveLength(1)
     expect(word.is_saved).toBe(0)
   })
 
-  it('updates meaning when the word already exists', () => {
+  it('updates meanings when the word already exists', () => {
     db.upsertWord(makeWord('ponder'), LOCALE)
-    const updated = db.upsertWord(makeWord('ponder', { meaning: 'Updated meaning' }), LOCALE)
-    expect(updated.translation.meaning).toBe('Updated meaning')
+    const newMeanings = [{ context: 'Updated', meaning_en: 'Updated en', meaning_short: 'Updated short', meaning: 'Updated meaning', examples: [] }]
+    const updated = db.upsertWord(makeWord('ponder', { meanings: newMeanings }), LOCALE)
+    expect(updated.meanings[0].meaning).toBe('Updated meaning')
   })
 
   it('does not reset is_saved on update', () => {
     db.upsertWord(makeWord('ponder'), LOCALE)
     db.toggleSaved('ponder')
-    const updated = db.upsertWord(makeWord('ponder', { meaning: 'Again' }), LOCALE)
+    const newMeanings = [{ context: 'General', meaning_en: 'Again en', meaning_short: 'Again short', meaning: 'Again', examples: [] }]
+    const updated = db.upsertWord(makeWord('ponder', { meanings: newMeanings }), LOCALE)
     expect(updated.is_saved).toBe(1)
   })
 })
@@ -208,7 +215,7 @@ describe('removeFromHistory', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Novos campos: verb_forms, meaning_en, antonyms, tip
+// Novos campos: verb_forms, meanings, antonyms
 // ---------------------------------------------------------------------------
 describe('novos campos — persistência', () => {
   afterEach(() => { try { db.deleteWord('scrutinize') } catch { /* no-op */ } })
@@ -233,10 +240,18 @@ describe('novos campos — persistência', () => {
     expect(result.verb_forms).toBeNull()
   })
 
-  it('salva e recupera meaning_en', () => {
-    db.upsertWord(makeWord('scrutinize', { meaning_en: 'To examine closely and critically.' }), LOCALE)
+  it('salva e recupera meanings com meaning_en dentro de cada entrada', () => {
+    const meanings = [{
+      context: 'Formal',
+      meaning_en: 'To examine closely and critically.',
+      meaning_short: 'Examinar de perto e criticamente.',
+      meaning: 'Olhar algo com muita atenção, procurando detalhes ou falhas.',
+      examples: [{ en: 'She scrutinized the contract.', translation: 'Ela examinou o contrato.' }],
+    }]
+    db.upsertWord(makeWord('scrutinize', { meanings }), LOCALE)
     const result = db.getWord('scrutinize', LOCALE)!
-    expect(result.meaning_en).toBe('To examine closely and critically.')
+    expect(result.meanings[0].meaning_en).toBe('To examine closely and critically.')
+    expect(result.meanings[0].context).toBe('Formal')
   })
 
   it('salva e recupera antonyms como JSON', () => {
@@ -251,56 +266,47 @@ describe('novos campos — persistência', () => {
     expect(result.antonyms).toEqual([])
   })
 
-  it('salva e recupera tip em word_translations', () => {
-    db.upsertWord(makeWord('scrutinize', { tip: 'Não confunda com "scan".' }), LOCALE)
-    const result = db.getWord('scrutinize', LOCALE)!
-    expect(result.translation.tip).toBe('Não confunda com "scan".')
+  it('meanings é locale-específico', () => {
+    const ptMeanings = [{ context: 'General', meaning_en: 'To examine', meaning_short: 'Examinar', meaning: 'Olhar com atenção', examples: [] }]
+    const esMeanings = [{ context: 'General', meaning_en: 'To examine', meaning_short: 'Examinar', meaning: 'Mirar con atención', examples: [] }]
+    db.upsertWord(makeWord('scrutinize', { meanings: ptMeanings }), 'pt-BR')
+    db.upsertWord(makeWord('scrutinize', { meanings: esMeanings }), 'es')
+    expect(db.getWord('scrutinize', 'pt-BR')!.meanings[0].meaning).toBe('Olhar com atenção')
+    expect(db.getWord('scrutinize', 'es')!.meanings[0].meaning).toBe('Mirar con atención')
   })
 
-  it('tip é locale-específico', () => {
-    db.upsertWord(makeWord('scrutinize', { tip: 'Dica em PT' }), 'pt-BR')
-    db.upsertWord(makeWord('scrutinize', { tip: 'Consejo en ES' }), 'es')
-    expect(db.getWord('scrutinize', 'pt-BR')!.translation.tip).toBe('Dica em PT')
-    expect(db.getWord('scrutinize', 'es')!.translation.tip).toBe('Consejo en ES')
-  })
-
-  it('upsert atualiza os novos campos ao fazer conflito', () => {
-    db.upsertWord(makeWord('scrutinize', { meaning_en: 'Original', antonyms: ['a'] }), LOCALE)
-    db.upsertWord(makeWord('scrutinize', { meaning_en: 'Updated', antonyms: ['b', 'c'] }), LOCALE)
+  it('upsert atualiza meanings e antonyms ao fazer conflito', () => {
+    db.upsertWord(makeWord('scrutinize', { antonyms: ['a'] }), LOCALE)
+    const newMeanings = [{ context: 'Updated', meaning_en: 'Updated', meaning_short: 'Atualizado', meaning: 'Atualizado', examples: [] }]
+    db.upsertWord(makeWord('scrutinize', { meanings: newMeanings, antonyms: ['b', 'c'] }), LOCALE)
     const result = db.getWord('scrutinize', LOCALE)!
-    expect(result.meaning_en).toBe('Updated')
+    expect(result.meanings[0].meaning_en).toBe('Updated')
     expect(result.antonyms).toEqual(['b', 'c'])
-  })
-
-  it('upsert atualiza tip ao fazer conflito', () => {
-    db.upsertWord(makeWord('scrutinize', { tip: 'Dica original' }), LOCALE)
-    db.upsertWord(makeWord('scrutinize', { tip: 'Dica atualizada' }), LOCALE)
-    const result = db.getWord('scrutinize', LOCALE)!
-    expect(result.translation.tip).toBe('Dica atualizada')
   })
 })
 
 // ---------------------------------------------------------------------------
-// Novos campos — getHistory e getSaved incluem tip via JOIN
+// Novos campos — getHistory e getSaved incluem meanings via JOIN
 // ---------------------------------------------------------------------------
 describe('novos campos — listas (getHistory / getSaved)', () => {
   afterEach(() => { try { db.deleteWord('ephemeral') } catch { /* no-op */ } })
 
-  it('getHistory retorna tip corretamente via JOIN', () => {
-    db.upsertWord(makeWord('ephemeral', { tip: 'Dica histórico' }), LOCALE)
+  it('getHistory retorna meanings corretamente via JOIN', () => {
+    db.upsertWord(makeWord('ephemeral'), LOCALE)
     const history = db.getHistory(50, LOCALE)
     const found = history.find(w => w.word === 'ephemeral')
     expect(found).toBeDefined()
-    expect(found!.translation.tip).toBe('Dica histórico')
+    expect(found!.meanings).toHaveLength(1)
+    expect(found!.meanings[0].meaning).toBe('Meaning of ephemeral')
   })
 
-  it('getSaved retorna tip corretamente via JOIN', () => {
-    db.upsertWord(makeWord('ephemeral', { tip: 'Dica salvo' }), LOCALE)
+  it('getSaved retorna meanings corretamente via JOIN', () => {
+    db.upsertWord(makeWord('ephemeral'), LOCALE)
     db.toggleSaved('ephemeral')
     const saved = db.getSaved(LOCALE)
     const found = saved.find(w => w.word === 'ephemeral')
     expect(found).toBeDefined()
-    expect(found!.translation.tip).toBe('Dica salvo')
+    expect(found!.meanings).toHaveLength(1)
   })
 
   it('getHistory retorna antonyms corretamente', () => {
@@ -312,7 +318,7 @@ describe('novos campos — listas (getHistory / getSaved)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Compatibilidade retroativa — campos novos ausentes retornam defaults seguros
+// Compatibilidade retroativa — campos ausentes retornam defaults seguros
 // ---------------------------------------------------------------------------
 describe('compatibilidade retroativa — defaults seguros', () => {
   afterEach(() => { try { db.deleteWord('legacy') } catch { /* no-op */ } })
@@ -322,19 +328,15 @@ describe('compatibilidade retroativa — defaults seguros', () => {
     expect(db.getWord('legacy', LOCALE)!.verb_forms).toBeNull()
   })
 
-  it('retorna string vazia para meaning_en ausente', () => {
-    db.upsertWord(makeWord('legacy', { meaning_en: '' }), LOCALE)
-    expect(db.getWord('legacy', LOCALE)!.meaning_en).toBe('')
-  })
-
   it('retorna array vazio para antonyms ausente', () => {
     db.upsertWord(makeWord('legacy', { antonyms: [] }), LOCALE)
     expect(db.getWord('legacy', LOCALE)!.antonyms).toEqual([])
   })
 
-  it('retorna string vazia para tip ausente', () => {
-    db.upsertWord(makeWord('legacy', { tip: '' }), LOCALE)
-    expect(db.getWord('legacy', LOCALE)!.translation.tip).toBe('')
+  it('retorna meanings com array vazio de examples', () => {
+    const meanings = [{ context: 'General', meaning_en: 'Test', meaning_short: 'Teste', meaning: 'Teste', examples: [] }]
+    db.upsertWord(makeWord('legacy', { meanings }), LOCALE)
+    expect(db.getWord('legacy', LOCALE)!.meanings[0].examples).toEqual([])
   })
 })
 

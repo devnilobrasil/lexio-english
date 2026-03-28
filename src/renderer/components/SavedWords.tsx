@@ -38,7 +38,7 @@ export function SavedWords({ words, onSelect, onRemove }: SavedWordsProps) {
             <div className="flex flex-col gap-1">
               <h4 className="font-serif text-lg font-semibold text-text-primary leading-tight">{w.word}</h4>
               <p className="font-sans text-meta text-text-muted truncate max-w-75">
-                {w.translation.meaning}
+                {w.meanings[0]?.meaning_short}
               </p>
             </div>
 
