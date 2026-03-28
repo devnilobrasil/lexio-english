@@ -18,13 +18,13 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
       {/* Word Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h1 className="font-serif text-word-title font-semibold text-text-primary leading-none mb-2 tracking-title">
+          <h1 className="font-serif text-word-title font-semibold text-text-primary leading-none mb-3 tracking-title">
             {word.word}
           </h1>
           <div className="flex items-center gap-2.5">
             {word.phonetic && (
               <span className="font-serif text-example italic text-text-muted">
-                /{word.phonetic}/
+                {word.phonetic}
               </span>
             )}
             <div className="w-0.5 h-0.5 rounded-full bg-separator" />
@@ -62,24 +62,31 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
         </button>
       </div>
 
-      {/* Meaning */}
+      {/* Meanings */}
       <div className="mb-5">
         <SectionLabel>{t('word.meaning')}</SectionLabel>
-        <p className="font-serif text-meaning text-text-primary mb-2">
-          {word.translation.meaning}
-        </p>
-        {word.meaning_en && (
-          <p className="font-sans text-meta italic text-text-muted">
-            {word.meaning_en}
-          </p>
-        )}
+        {word.meanings.map((m, i) => (
+          <div key={i} className={i > 0 ? 'mt-4' : ''}>
+            <span className="font-sans text-label font-medium tracking-badge uppercase text-tag-text">
+              {m.context}
+            </span>
+            <p data-testid={`meaning-short-${i}`} className="font-serif text-base text-text-primary mt-1 mb-1">
+              {m.meaning_short}
+            </p>
+            {m.meaning_en && (
+              <p className="font-sans text-meta italic text-text-muted">
+                {m.meaning_en}
+              </p>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Verb Forms */}
       {word.pos === 'verb' && word.verb_forms && (
         <div className="mb-5">
           <SectionLabel>{t('word.verbForms')}</SectionLabel>
-          <div className="grid grid-cols-5 gap-x-3 gap-y-1">
+          <div className="grid grid-cols-3 gap-3">
             {(
               [
                 ['verbInfinitive',        word.verb_forms.infinitive],
@@ -102,12 +109,12 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
         </div>
       )}
 
-      {/* Tip */}
-      {word.translation.tip && (
+      {/* Explicação detalhada do primeiro significado */}
+      {word.meanings[0]?.meaning && (
         <div className="mb-1">
           <SectionLabel>{t('word.tip')}</SectionLabel>
           <p className="font-sans text-meta italic text-text-muted">
-            {word.translation.tip}
+            {word.meanings[0].meaning}
           </p>
         </div>
       )}

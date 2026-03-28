@@ -18,13 +18,13 @@ const LOCALE_NAMES: Record<Locale, string> = {
 }
 
 const LOCALE_INSTRUCTIONS: Record<Locale, string> = {
-  'pt-BR': `- "meaning" must be written in natural Brazilian Portuguese, as a Brazilian would explain it to a friend — not a dictionary translation
+  'pt-BR': `- The "meaning" field inside each meanings entry must be written in natural Brazilian Portuguese, as a Brazilian would explain it to a friend — not a dictionary translation
+- "meaning_short" must be a faithful word-for-word translation of "meaning_en" into Brazilian Portuguese — translate the exact same content, do not summarize
 - "translation" in examples must sound natural in Brazilian Portuguese, not word-for-word
-- "tip" must be written in Brazilian Portuguese
 - Use Brazilian vocabulary and expressions, not European Portuguese`,
-  'es': `- "meaning" must be written in natural Spanish, as a native speaker would explain it to a friend
-- "translation" in examples must sound natural in Spanish, not word-for-word
-- "tip" must be written in Spanish`,
+  'es': `- The "meaning" field inside each meanings entry must be written in natural Spanish, as a native speaker would explain it to a friend
+- "meaning_short" must be a faithful word-for-word translation of "meaning_en" into Spanish — translate the exact same content, do not summarize
+- "translation" in examples must sound natural in Spanish, not word-for-word`,
 }
 
 const buildUserPrompt = (word: string, locale: Locale): string => `
@@ -42,34 +42,35 @@ For the English word "${word}", return exactly this JSON structure with no devia
     "third_person": "third person singular present"
   },
   "level": "one of: Basic | Intermediate | Advanced | Technical",
-  "meaning": "clear and natural explanation in ${LOCALE_NAMES[locale]} — explain it like a knowledgeable friend would, not a dictionary",
-  "meaning_en": "concise English definition in plain language, 1 sentence max",
-  "examples": [
+  "meanings": [
     {
-      "en": "natural, real-world sentence showing the word in a professional or everyday context",
-      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
-    },
-    {
-      "en": "sentence showing the word in a different context or grammatical structure than example 1",
-      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
-    },
-    {
-      "en": "sentence that could appear in a book, article, podcast, or real conversation",
-      "translation": "natural translation in ${LOCALE_NAMES[locale]}"
+      "context": "Brief context tag (e.g., General, Business, Computing, Slang, Phrasal Verb, Sports)",
+      "meaning_en": "concise English definition in plain language, 1 sentence max",
+      "meaning_short": "faithful word-for-word translation of meaning_en into ${LOCALE_NAMES[locale]} — translate the exact same content, do not summarize",
+      "meaning": "clear and natural explanation in ${LOCALE_NAMES[locale]} — explain it like a knowledgeable friend would",
+      "examples": [
+        {
+          "en": "natural, real-world sentence showing this specific meaning in context",
+          "translation": "natural translation in ${LOCALE_NAMES[locale]}"
+        }
+      ]
     }
   ],
   "synonyms": ["3 to 5 genuinely interchangeable synonyms in common contexts"],
   "antonyms": ["1 to 3 antonyms if applicable, empty array if none"],
-  "contexts": ["1 to 3 contexts where this word is most commonly used"],
-  "tip": "one practical memorization tip or common mistake to avoid, written in ${LOCALE_NAMES[locale]}"
+  "contexts": ["1 to 3 contexts where this word is most commonly used"]
 }
 
-Rules:
-- If the word is NOT a verb, set "verb_forms" to null
-- The three examples must show different usages or sentence structures — do not repeat the same pattern
-- "contexts" must be chosen from: Business, Technology, Informal, Formal, Finance, Marketing, HR, Legal, Medicine, Slang, Academic, Literature, Sports, Travel
-- "tip" should mention a common mistake learners make OR a trick to remember the word OR a nuance that distinguishes it from similar words
+Critical rules for "meanings":
+- You MUST return between 2 and 5 distinct meanings. Think carefully: most common English words have multiple senses (e.g., "save" = rescue, store data, keep money, prevent a goal in sports, etc.). Do NOT collapse different senses into one entry.
+- Each meaning must represent a genuinely different use of the word, not a rephrasing of the same idea.
+- Each meaning MUST include at least 1 example. If the word has only 1–2 meanings, provide 2–3 examples per meaning to compensate.
+- Examples must be real-world, practical sentences — not generic or textbook-style. Each example within a meaning must use a different sentence structure.
+- Include common phrasal verbs as separate meanings if they are a primary way the word is used (e.g., "churn out", "save up", "run into").
 
+Other rules:
+- If the word is NOT a verb, set "verb_forms" to null
+- "contexts" must be chosen from: Business, Technology, Informal, Formal, Finance, Marketing, HR, Legal, Medicine, Slang, Academic, Literature, Sports, Travel
 ${LOCALE_INSTRUCTIONS[locale]}`
 
 export async function fetchWordFromGroq(word: string, locale: Locale): Promise<AIWordResponse> {
