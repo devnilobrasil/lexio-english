@@ -1,6 +1,7 @@
 ---
 name: claude-api-patterns
 description: Padrões para uso da Claude API no Lexio — wrapper, system prompt, formato JSON esperado, parsing seguro e cache SQLite. Consultar antes de qualquer modificação em src/renderer/lib/claude.ts.
+context: fork
 ---
 
 # Claude API Patterns Skill

@@ -7,13 +7,24 @@ export interface WordExample {
   translation: string  // locale-aware (era "pt")
 }
 
-export interface WordTranslation {
-  locale: Locale
+export interface VerbForms {
+  infinitive: string
+  past: string
+  past_participle: string
+  present_participle: string
+  third_person: string
+}
+
+export interface MeaningEntry {
+  context: string
+  meaning_en: string
+  meaning_short: string
   meaning: string
   examples: WordExample[]
 }
 
-export type PartOfSpeech = 'verb' | 'noun' | 'adjective' | 'adverb' | 'phrase' | 'idiom'
+export type PartOfSpeech =
+  'verb' | 'noun' | 'adjective' | 'adverb' | 'phrase' | 'idiom' | 'conjunction' | 'preposition'
 export type WordLevel = 'Basic' | 'Intermediate' | 'Advanced' | 'Technical'
 
 export interface Word {
@@ -22,9 +33,11 @@ export interface Word {
   phonetic: string | null
   pos: PartOfSpeech | null
   level: WordLevel | null
+  verb_forms: VerbForms | null
+  meanings: MeaningEntry[]
   synonyms: string[]
+  antonyms: string[]
   contexts: string[]
-  translation: WordTranslation  // tradução do locale ativo
   created_at?: string
   last_viewed?: string
   view_count?: number
@@ -37,10 +50,11 @@ export interface AIWordResponse {
   phonetic: string | null
   pos: PartOfSpeech | null
   level: WordLevel | null
+  verb_forms: VerbForms | null
+  meanings: MeaningEntry[]
   synonyms: string[]
+  antonyms: string[]
   contexts: string[]
-  meaning: string
-  examples: WordExample[]
 }
 
 // API IPC exposta ao renderer via contextBridge
@@ -55,6 +69,11 @@ export interface LexioAPI {
   getSaved:       (locale: Locale)                        => Promise<Word[]>
   closeWindow:    ()                                      => void
   minimizeWindow: ()                                      => void
+  resizeWindow:   (state: 'idle' | 'result')              => void
+  onUpdateAvailable:  (cb: (version: string) => void) => void
+  onUpdateProgress:   (cb: (pct: number) => void)     => void
+  onUpdateDownloaded: (cb: (version: string) => void) => void
+  installUpdate:      ()                              => void
 }
 
 // Augment global window para o renderer reconhecer window.lexio

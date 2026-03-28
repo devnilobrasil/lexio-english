@@ -1,6 +1,7 @@
 ---
 name: sqlite-patterns
 description: Padrões de acesso ao banco de dados SQLite do Lexio via better-sqlite3. Inclui regras de onde colocar queries, como serializar/deserializar campos JSON, e como alterar o schema com segurança.
+context: fork
 ---
 
 # SQLite Patterns Skill

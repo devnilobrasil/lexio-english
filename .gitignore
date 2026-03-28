@@ -45,3 +45,6 @@ node_modules/
 #mcp
 .mcp.json
 .claude/settings.local.json
+.claude/implementation_plan.md
+.claude/plan_rich_prompt.md
+.claude/pre-plan.md

@@ -35,3 +35,8 @@ linux:
   target: AppImage
   category: Education
   icon: src/assets/icon.ico
+
+publish:
+  provider: github
+  owner: devnilobrasil
+  repo: lexio-english

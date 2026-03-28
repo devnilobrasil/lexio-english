@@ -2,7 +2,7 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import { app } from 'electron'
-import type { Word, AIWordResponse, Locale, PartOfSpeech, WordLevel } from '../types'
+import type { Word, AIWordResponse, Locale, PartOfSpeech, WordLevel, MeaningEntry } from '../types'
 
 // Row raw do SQLite após JOIN com word_translations
 interface WordRow {
@@ -11,15 +11,16 @@ interface WordRow {
   phonetic: string | null
   pos: string | null
   level: string | null
+  verb_forms: string | null
   synonyms: string
+  antonyms: string
   contexts: string
   created_at: string
   last_viewed: string
   view_count: number
   is_saved: 0 | 1
   // Campos do JOIN
-  meaning: string | null
-  trans_examples: string | null
+  meanings: string | null
   trans_locale: string | null
 }
 
@@ -66,6 +67,40 @@ export function init(): void {
   if (!allCols.some(c => c.name === 'in_history')) {
     db.exec(`ALTER TABLE words ADD COLUMN in_history INTEGER DEFAULT 1`)
   }
+  if (!allCols.some(c => c.name === 'verb_forms')) {
+    db.exec(`ALTER TABLE words ADD COLUMN verb_forms TEXT`)
+  }
+  if (!allCols.some(c => c.name === 'meaning_en')) {
+    db.exec(`ALTER TABLE words ADD COLUMN meaning_en TEXT`)
+  }
+  if (!allCols.some(c => c.name === 'antonyms')) {
+    db.exec(`ALTER TABLE words ADD COLUMN antonyms TEXT DEFAULT '[]'`)
+  }
+
+  const transCols = db.pragma('table_info(word_translations)') as { name: string }[]
+  if (!transCols.some(c => c.name === 'meaning_short')) {
+    db.exec(`ALTER TABLE word_translations ADD COLUMN meaning_short TEXT`)
+  }
+
+  // Migração: adicionar coluna meanings (JSON array) e migrar dados antigos
+  if (!transCols.some(c => c.name === 'meanings')) {
+    db.exec(`ALTER TABLE word_translations ADD COLUMN meanings TEXT`)
+    // Migra registros antigos: monta um meanings array a partir dos campos flat
+    const oldRows = db.prepare(
+      `SELECT word, locale, meaning_short, meaning, examples FROM word_translations WHERE meanings IS NULL AND meaning IS NOT NULL`
+    ).all() as { word: string; locale: string; meaning_short: string | null; meaning: string; examples: string | null }[]
+    const updateStmt = db.prepare(`UPDATE word_translations SET meanings = ? WHERE word = ? AND locale = ?`)
+    for (const r of oldRows) {
+      const entry = [{
+        context: 'General',
+        meaning_en: '',
+        meaning_short: r.meaning_short ?? '',
+        meaning: r.meaning,
+        examples: JSON.parse(r.examples ?? '[]'),
+      }]
+      updateStmt.run(JSON.stringify(entry), r.word, r.locale)
+    }
+  }
 
   // Migração: mover meaning_pt / meaning_en / examples para word_translations
   const cols = allCols
@@ -90,13 +125,13 @@ export function init(): void {
 
 export function getWord(word: string, locale: Locale): Word | null {
   const row = db.prepare(`
-    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+    SELECT w.*, wt.meanings, wt.locale AS trans_locale
     FROM words w
     LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
     WHERE w.word = ? COLLATE NOCASE
   `).get(locale, word) as WordRow | undefined
 
-  if (!row || !row.meaning) return null
+  if (!row || !row.meanings) return null
 
   db.prepare(
     `UPDATE words SET view_count = view_count + 1, last_viewed = datetime('now') WHERE word = ?`
@@ -107,36 +142,40 @@ export function getWord(word: string, locale: Locale): Word | null {
 
 export function upsertWord(data: AIWordResponse, locale: Locale): Word {
   db.prepare(`
-    INSERT INTO words (word, phonetic, pos, level, synonyms, contexts)
-    VALUES (@word, @phonetic, @pos, @level, @synonyms, @contexts)
+    INSERT INTO words (word, phonetic, pos, level, verb_forms, synonyms, antonyms, contexts)
+    VALUES (@word, @phonetic, @pos, @level, @verb_forms, @synonyms, @antonyms, @contexts)
     ON CONFLICT(word) DO UPDATE SET
       phonetic    = excluded.phonetic,
       pos         = excluded.pos,
       level       = excluded.level,
+      verb_forms  = excluded.verb_forms,
       synonyms    = excluded.synonyms,
+      antonyms    = excluded.antonyms,
       contexts    = excluded.contexts,
       last_viewed = datetime('now'),
       view_count  = view_count + 1
   `).run({
-    word:     data.word,
-    phonetic: data.phonetic,
-    pos:      data.pos,
-    level:    data.level,
-    synonyms: JSON.stringify(data.synonyms ?? []),
-    contexts: JSON.stringify(data.contexts ?? []),
+    word:       data.word,
+    phonetic:   data.phonetic,
+    pos:        data.pos,
+    level:      data.level,
+    verb_forms: data.verb_forms ? JSON.stringify(data.verb_forms) : null,
+    synonyms:   JSON.stringify(data.synonyms ?? []),
+    antonyms:   JSON.stringify(data.antonyms ?? []),
+    contexts:   JSON.stringify(data.contexts ?? []),
   })
 
   db.prepare(`
-    INSERT INTO word_translations (word, locale, meaning, examples)
-    VALUES (@word, @locale, @meaning, @examples)
+    INSERT INTO word_translations (word, locale, meaning, meanings)
+    VALUES (@word, @locale, @meaning, @meanings)
     ON CONFLICT(word, locale) DO UPDATE SET
       meaning  = excluded.meaning,
-      examples = excluded.examples
+      meanings = excluded.meanings
   `).run({
     word:     data.word,
     locale,
-    meaning:  data.meaning,
-    examples: JSON.stringify(data.examples ?? []),
+    meaning:  data.meanings[0]?.meaning ?? '',
+    meanings: JSON.stringify(data.meanings),
   })
 
   return getWord(data.word, locale)!
@@ -150,7 +189,7 @@ export function toggleSaved(word: string): Word {
 
   // Busca com qualquer tradução disponível
   const row = db.prepare(`
-    SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+    SELECT w.*, wt.meanings, wt.locale AS trans_locale
     FROM words w
     LEFT JOIN word_translations wt ON wt.word = w.word
     WHERE w.word = ?
@@ -177,7 +216,7 @@ export function getHistory(limit = 30, locale: Locale): Word[] {
   const safeLimit = Math.max(1, Math.floor(Number(limit) || 30))
   return (
     db.prepare(`
-      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+      SELECT w.*, wt.meanings, wt.locale AS trans_locale
       FROM words w
       LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
       WHERE w.in_history = 1
@@ -189,7 +228,7 @@ export function getHistory(limit = 30, locale: Locale): Word[] {
 export function getSaved(locale: Locale): Word[] {
   return (
     db.prepare(`
-      SELECT w.*, wt.meaning, wt.examples AS trans_examples, wt.locale AS trans_locale
+      SELECT w.*, wt.meanings, wt.locale AS trans_locale
       FROM words w
       LEFT JOIN word_translations wt ON wt.word = w.word AND wt.locale = ?
       WHERE w.is_saved = 1
@@ -205,13 +244,11 @@ function deserialize(row: WordRow): Word {
     phonetic:   row.phonetic,
     pos:        row.pos as PartOfSpeech | null,
     level:      row.level as WordLevel | null,
+    verb_forms: row.verb_forms ? JSON.parse(row.verb_forms) : null,
+    meanings:   JSON.parse(row.meanings ?? '[]') as MeaningEntry[],
     synonyms:   JSON.parse(row.synonyms ?? '[]'),
+    antonyms:   JSON.parse(row.antonyms ?? '[]'),
     contexts:   JSON.parse(row.contexts ?? '[]'),
-    translation: {
-      locale:   (row.trans_locale ?? 'pt-BR') as Locale,
-      meaning:  row.meaning ?? '',
-      examples: JSON.parse(row.trans_examples ?? '[]'),
-    },
     created_at:  row.created_at,
     last_viewed: row.last_viewed,
     view_count:  row.view_count,
