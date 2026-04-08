@@ -3,7 +3,7 @@ import { app, Menu, Tray, nativeImage, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
-export function createTray(win: BrowserWindow): Tray {
+export function createTray(win: BrowserWindow, overlay: BrowserWindow): Tray {
   const iconPath = path.join(__dirname, '../../public/logo/tray.ico')
   let icon
   
@@ -26,9 +26,24 @@ export function createTray(win: BrowserWindow): Tray {
       } 
     },
     { type: 'separator' },
-    { 
-      label: 'Atalho: ' + (process.platform === 'darwin' ? '⌘+Shift+E' : 'Ctrl+Shift+E'), 
-      enabled: false 
+    {
+      label: 'Atalho: ' + (process.platform === 'darwin' ? '⌘+Alt+E' : 'Ctrl+Alt+E'),
+      enabled: false
+    },
+    { type: 'separator' },
+    {
+      label: 'Tradução: Ctrl+Alt+T',
+      enabled: false,
+    },
+    {
+      label: 'Mostrar/Ocultar Overlay',
+      click: () => {
+        if (overlay.isVisible()) {
+          overlay.hide()
+        } else {
+          overlay.show()
+        }
+      },
     },
     { type: 'separator' },
     { 

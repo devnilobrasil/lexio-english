@@ -2,7 +2,7 @@
 import { globalShortcut, screen, BrowserWindow } from 'electron'
 
 export function registerShortcut(win: BrowserWindow): void {
-  const shortcut = process.platform === 'darwin' ? 'Command+Shift+E' : 'Control+Shift+E'
+  const shortcut = process.platform === 'darwin' ? 'Command+Alt+E' : 'Control+Alt+E'
 
   globalShortcut.unregister(shortcut)
 
