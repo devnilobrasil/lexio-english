@@ -81,12 +81,25 @@ export function registerTranslateShortcut(overlay: BrowserWindow): void {
   const shortcut = 'Control+Alt+T'
   globalShortcut.unregister(shortcut)
   const ok = globalShortcut.register(shortcut, () => {
-    console.log('[overlay] Ctrl+Shift+T fired')
+    console.log('[overlay] Ctrl+Alt+T fired')
     runTranslationFlow(overlay).catch(err => {
       console.error('[overlay] translation error:', err)
       overlay.webContents.send('overlay:state', 'error')
       overlay.webContents.send('overlay:error', String(err))
     })
+  })
+  console.log(`[overlay] shortcut ${shortcut} registered:`, ok)
+}
+
+export function registerOverlayToggleShortcut(overlay: BrowserWindow): void {
+  const shortcut = 'Control+Alt+O'
+  globalShortcut.unregister(shortcut)
+  const ok = globalShortcut.register(shortcut, () => {
+    if (overlay.isVisible()) {
+      overlay.hide()
+    } else {
+      overlay.show()
+    }
   })
   console.log(`[overlay] shortcut ${shortcut} registered:`, ok)
 }
