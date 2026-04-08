@@ -1,9 +1,11 @@
 // src/main/translate.ts
 // Tradução direta de texto livre via Groq API — roda no main process
 
+import { getApiKey } from './db'
+
 export async function translateText(text: string): Promise<string> {
-  const apiKey = process.env.VITE_GROQ_API_KEY
-  if (!apiKey) throw new Error('VITE_GROQ_API_KEY not set in environment')
+  const apiKey = getApiKey()
+  if (!apiKey) throw new Error('API key not configured. Please set it in Settings.')
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',

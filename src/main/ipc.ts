@@ -18,7 +18,16 @@ export function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.on('window:minimize',   () => win.minimize())
   ipcMain.on('window:resize',     (_e, state: 'idle' | 'result') => {
     const height = state === 'idle' ? 60 : 420
-    win.setSize(600, height, true)
+    // Windows + transparent + resizable:false = setSize is ignored.
+    // Workaround: temporarily allow resize, apply, then lock again.
+    win.setResizable(true)
+    win.setSize(600, height)
+    win.setResizable(false)
   })
   ipcMain.on('update:install-now', () => quitAndInstall())
+
+  // Settings
+  ipcMain.handle('settings:getApiKey', () => db.getApiKey())
+  ipcMain.handle('settings:setApiKey', (_, key: string) => db.setApiKey(key))
+  ipcMain.handle('app:getVersion',     () => require('electron').app.getVersion())
 }

@@ -9,7 +9,8 @@
     "examples": "Exemplos",
     "synonyms": "Sinônimos",
     "saved": "Salvos",
-    "history": "Histórico"
+    "history": "Histórico",
+    "settings": "Configurações"
   },
   "search": {
     "placeholder": "Busque uma palavra em inglês...",
@@ -47,5 +48,15 @@
     "title": "Seu Vocabulário ({{count}})",
     "empty_title": "Nenhuma palavra salva",
     "empty_desc": "As palavras que você marcar como favoritas aparecerão aqui."
+  },
+  "settings": {
+    "title": "Configurações",
+    "apiKey": "Chave API (Groq)",
+    "apiKeyPlaceholder": "Cole sua chave da API aqui...",
+    "apiKeyHelper": "Obtenha sua chave em console.groq.com",
+    "save": "Salvar",
+    "saved": "Salvo ✓",
+    "about": "Sobre",
+    "required": "Uma chave API é necessária para usar o Lexio."
   }
 }
