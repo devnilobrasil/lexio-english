@@ -1,26 +1,15 @@
 // src/renderer/components/FloatingButton.tsx
 import { useEffect, useState, useRef } from 'react'
 import type { OverlayState } from '../../types'
+import lexioIcon from '../../assets/lexio-icon-512.png'
 import '../styles/overlay.css'
-
-const ICONS: Record<OverlayState, string> = {
-  idle:    'L',
-  loading: 'L',
-  success: '✓',
-  error:   '✗',
-}
-
-const ICON_CLASSES: Record<OverlayState, string> = {
-  idle:    'btn-icon',
-  loading: 'btn-icon',
-  success: 'btn-icon btn-icon--check',
-  error:   'btn-icon btn-icon--error',
-}
 
 export default function FloatingButton() {
   const [state, setState] = useState<OverlayState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const dragRef = useRef<{ startX: number; startY: number; winX: number; winY: number } | null>(null)
+  const lastClickRef = useRef<number>(0)
+  const DOUBLE_CLICK_MS = 350
 
   useEffect(() => {
     window.lexioOverlay.onStateChange(setState)
@@ -29,6 +18,16 @@ export default function FloatingButton() {
 
   function handleMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return
+
+    // Detecta duplo clique manualmente (funciona em janelas focusable:false)
+    const now = Date.now()
+    if (now - lastClickRef.current < DOUBLE_CLICK_MS) {
+      lastClickRef.current = 0
+      if (state === 'idle') window.lexioOverlay.translate()
+      return
+    }
+    lastClickRef.current = now
+
     window.lexioOverlay.dragStart()
     dragRef.current = {
       startX: e.screenX,
@@ -57,22 +56,13 @@ export default function FloatingButton() {
     window.addEventListener('mouseup', onMouseUp)
   }
 
-  function handleClick() {
-    if (state === 'idle') {
-      window.lexioOverlay.translate()
-    }
-  }
-
   return (
     <button
       className={`floating-btn floating-btn--${state}`}
       onMouseDown={handleMouseDown}
-      onClick={handleClick}
-      title={errorMsg || 'Traduzir seleção (Ctrl+Shift+T)'}
+      title={errorMsg || 'Traduzir seleção (duplo clique ou Ctrl+Alt+T)'}
     >
-      <span className={ICON_CLASSES[state]}>
-        {ICONS[state]}
-      </span>
+      <img src={lexioIcon} className="btn-icon-img" alt="Lexio" />
     </button>
   )
 }

@@ -78,7 +78,7 @@ export function createOverlayWindow(): BrowserWindow {
 }
 
 export function registerTranslateShortcut(overlay: BrowserWindow): void {
-  const shortcut = 'Control+Shift+T'
+  const shortcut = 'Control+Alt+T'
   globalShortcut.unregister(shortcut)
   const ok = globalShortcut.register(shortcut, () => {
     console.log('[overlay] Ctrl+Shift+T fired')

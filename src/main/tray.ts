@@ -27,12 +27,12 @@ export function createTray(win: BrowserWindow, overlay: BrowserWindow): Tray {
     },
     { type: 'separator' },
     {
-      label: 'Atalho: ' + (process.platform === 'darwin' ? '⌘+Shift+E' : 'Ctrl+Shift+E'),
+      label: 'Atalho: ' + (process.platform === 'darwin' ? '⌘+Alt+E' : 'Ctrl+Alt+E'),
       enabled: false
     },
     { type: 'separator' },
     {
-      label: 'Tradução: Ctrl+Shift+T',
+      label: 'Tradução: Ctrl+Alt+T',
       enabled: false,
     },
     {
