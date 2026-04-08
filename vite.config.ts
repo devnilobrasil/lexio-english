@@ -17,6 +17,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        overlay: 'overlay.html',
+      },
+    },
   },
   server: {
     port: 5173,

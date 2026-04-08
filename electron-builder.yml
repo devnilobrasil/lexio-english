@@ -11,6 +11,8 @@ files:
   - dist-main/**/*
   - package.json
   - public/**/*
+  - node_modules/selection-hook/**/*
+  - node_modules/@nut-tree-fork/**/*
 
 # Windows configuration
 win:

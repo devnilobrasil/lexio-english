@@ -1,0 +1,99 @@
+/* src/renderer/styles/overlay.css */
+/* Reset mínimo para a janela overlay */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #overlay-root {
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  background: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Botão flutuante */
+.floating-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f0e8;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  -webkit-app-region: no-drag;
+  font-family: 'Inter', sans-serif;
+}
+
+.floating-btn:active {
+  cursor: grabbing;
+}
+
+/* Estado idle */
+.floating-btn--idle {
+  opacity: 0.6;
+}
+
+.floating-btn--idle:hover {
+  opacity: 0.9;
+}
+
+/* Estado loading */
+.floating-btn--loading {
+  opacity: 1;
+}
+
+.floating-btn--loading .btn-icon {
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+/* Estado success */
+.floating-btn--success {
+  background: #e8f0ea;
+  opacity: 1;
+  animation: fade-out 2s ease forwards;
+  animation-delay: 0.5s;
+}
+
+/* Estado error */
+.floating-btn--error {
+  background: #f0e8e8;
+  opacity: 1;
+}
+
+/* Ícone "L" */
+.btn-icon {
+  font-size: 22px;
+  font-weight: 600;
+  color: #4a3f2f;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Check mark para success */
+.btn-icon--check {
+  font-size: 20px;
+  color: #3a6b42;
+}
+
+/* X para error */
+.btn-icon--error {
+  font-size: 20px;
+  color: #8b3a3a;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.85); }
+}
+
+@keyframes fade-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0.6; }
+}
