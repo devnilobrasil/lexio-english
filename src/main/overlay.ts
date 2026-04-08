@@ -80,20 +80,28 @@ export function createOverlayWindow(): BrowserWindow {
 export function registerTranslateShortcut(overlay: BrowserWindow): void {
   const shortcut = 'Control+Shift+T'
   globalShortcut.unregister(shortcut)
-  globalShortcut.register(shortcut, () => {
+  const ok = globalShortcut.register(shortcut, () => {
+    console.log('[overlay] Ctrl+Shift+T fired')
     runTranslationFlow(overlay).catch(err => {
       console.error('[overlay] translation error:', err)
       overlay.webContents.send('overlay:state', 'error')
       overlay.webContents.send('overlay:error', String(err))
     })
   })
+  console.log(`[overlay] shortcut ${shortcut} registered:`, ok)
 }
 
 async function runTranslationFlow(overlay: BrowserWindow): Promise<void> {
-  const selection = await captureSelection()
-  if (!selection?.text) return
-
   overlay.webContents.send('overlay:state', 'loading')
+
+  const selection = await captureSelection()
+  if (!selection?.text) {
+    console.warn('[overlay] no selection captured, aborting')
+    overlay.webContents.send('overlay:state', 'idle')
+    return
+  }
+
+  console.log('[overlay] translating:', selection.text.substring(0, 80))
 
   const translated = await translateText(selection.text)
   await injectText(translated)

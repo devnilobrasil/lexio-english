@@ -3,28 +3,51 @@
 
 import type { TextSelection } from '../types'
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const SelectionHook = require('selection-hook')
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { keyboard, Key } = require('@nut-tree-fork/nut-js')
-
-const LONG_TEXT_THRESHOLD = 500
-
-let hook: InstanceType<typeof SelectionHook> | null = null
+// Lazy refs — evitam crash do processo main se o módulo nativo falhar ao carregar
+let _hook: { start: () => void; stop: () => void; cleanup: () => void; getCurrentSelection: () => unknown; setSelectionPassiveMode: (passive: boolean) => boolean } | null = null
+let _keyboard: { config: { autoDelayMs: number }; type: (s: string) => Promise<void>; pressKey: (...k: unknown[]) => Promise<void>; releaseKey: (...k: unknown[]) => Promise<void> } | null = null
+let _Key: Record<string, unknown> | null = null
 
 export function initSelectionHook(): void {
-  hook = new SelectionHook()
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const SelectionHook = require('selection-hook') as new () => typeof _hook
+    _hook = new SelectionHook()
+    // Passive mode: não emite eventos automáticos, apenas mantém a seleção atual
+    // para `getCurrentSelection()` — padrão recomendado para shortcut triggers
+    _hook!.setSelectionPassiveMode(true)
+    _hook!.start()
+    console.log('[text-bridge] selection-hook initialized (passive mode)')
+  } catch (err) {
+    console.error('[text-bridge] selection-hook failed to load:', err)
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nutJs = require('@nut-tree-fork/nut-js') as { keyboard: typeof _keyboard; Key: typeof _Key }
+    _keyboard = nutJs.keyboard
+    _keyboard!.config.autoDelayMs = 0  // remove o delay de 300ms entre cada evento de teclado
+    _Key = nutJs.Key
+    console.log('[text-bridge] nut-js initialized (autoDelayMs=0)')
+  } catch (err) {
+    console.error('[text-bridge] nut-js failed to load:', err)
+  }
 }
 
 export async function captureSelection(): Promise<TextSelection | null> {
-  if (!hook) return null
+  if (!_hook) {
+    console.warn('[text-bridge] selection-hook not available')
+    return null
+  }
 
   try {
-    const result = hook.getCurrentSelection() as {
+    const result = _hook.getCurrentSelection() as {
       text?: string
       programName?: string
       endBottom?: { x: number; y: number }
     }
+
+    console.log('[text-bridge] selection result:', JSON.stringify(result))
 
     if (!result?.text?.trim()) return null
 
@@ -40,22 +63,26 @@ export async function captureSelection(): Promise<TextSelection | null> {
 }
 
 export async function injectText(text: string): Promise<void> {
-  if (text.length <= LONG_TEXT_THRESHOLD) {
-    await keyboard.type(text)
+  if (!_keyboard || !_Key) {
+    console.error('[text-bridge] nut-js not available for injection')
     return
   }
 
-  // Clipboard fallback para textos longos (>500 chars)
+  // Clipboard paste é instantâneo (vs keyboard.type que digita letra por letra)
   const { clipboard } = await import('electron')
   const previous = clipboard.readText()
   clipboard.writeText(text)
-  await new Promise(r => setTimeout(r, 50))
-  await keyboard.pressKey(Key.LeftControl, Key.V)
-  await keyboard.releaseKey(Key.LeftControl, Key.V)
-  await new Promise(r => setTimeout(r, 100))
+  await new Promise(r => setTimeout(r, 60))
+  await _keyboard.pressKey(_Key['LeftControl'], _Key['V'])
+  await _keyboard.releaseKey(_Key['LeftControl'], _Key['V'])
+  await new Promise(r => setTimeout(r, 80))
   clipboard.writeText(previous)
 }
 
 export function cleanup(): void {
-  hook = null
+  _hook?.stop()
+  _hook?.cleanup()
+  _hook = null
+  _keyboard = null
+  _Key = null
 }
