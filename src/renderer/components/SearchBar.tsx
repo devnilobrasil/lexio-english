@@ -8,10 +8,11 @@ import wordmark from '../../assets/lexio-wordmark.png'
 interface SearchBarProps {
   onSearch: (query: string) => void
   onEscape: () => void
+  onLogoClick?: () => void
   loading?: boolean
 }
 
-export function SearchBar({ onSearch, onEscape, loading }: SearchBarProps) {
+export function SearchBar({ onSearch, onEscape, onLogoClick, loading }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const { t } = useTranslation()
@@ -45,7 +46,9 @@ export function SearchBar({ onSearch, onEscape, loading }: SearchBarProps) {
       <img
         src={wordmark}
         alt="Lexio"
-        className="h-6 opacity-80 shrink-0"
+        className="h-6 opacity-80 shrink-0 cursor-pointer hover:opacity-100 transition-opacity"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        onClick={onLogoClick}
       />
 
       <input

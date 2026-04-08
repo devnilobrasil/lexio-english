@@ -36,6 +36,10 @@ export function createTray(win: BrowserWindow, overlay: BrowserWindow): Tray {
       enabled: false,
     },
     {
+      label: 'Overlay: Ctrl+Alt+O',
+      enabled: false,
+    },
+    {
       label: 'Mostrar/Ocultar Overlay',
       click: () => {
         if (overlay.isVisible()) {

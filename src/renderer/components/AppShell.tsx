@@ -72,11 +72,20 @@ export function AppShell() {
     setActiveView(view)
   }, [])
 
+  const handleLogoClick = useCallback(() => {
+    if (windowState === 'idle') {
+      transitionTo('result')
+    } else {
+      transitionTo('idle')
+    }
+  }, [windowState, transitionTo])
+
   return (
     <div className={`app-shell ${windowState === 'result' ? 'bg-surface-base' : 'bg-surface-base/90'}`}>
       <SearchBar
         onSearch={handleSearch}
         onEscape={handleEscape}
+        onLogoClick={handleLogoClick}
         loading={loading}
       />
 

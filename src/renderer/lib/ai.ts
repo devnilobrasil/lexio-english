@@ -74,8 +74,8 @@ Other rules:
 ${LOCALE_INSTRUCTIONS[locale]}`
 
 export async function fetchWordFromGroq(word: string, locale: Locale): Promise<AIWordResponse> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY as string
-  if (!apiKey) throw new Error('Groq API key not found (VITE_GROQ_API_KEY)')
+  const apiKey = await window.lexio.getApiKey()
+  if (!apiKey) throw new Error('API key not configured. Please set it in Settings.')
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',

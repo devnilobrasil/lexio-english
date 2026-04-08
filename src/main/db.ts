@@ -60,6 +60,11 @@ export function init(): void {
     CREATE INDEX IF NOT EXISTS idx_saved   ON words(is_saved);
     CREATE INDEX IF NOT EXISTS idx_created ON words(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_trans   ON word_translations(word, locale);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 
   // Migração: adicionar coluna in_history se não existir
@@ -254,4 +259,25 @@ function deserialize(row: WordRow): Word {
     view_count:  row.view_count,
     is_saved:    row.is_saved,
   }
+}
+
+// ── Settings ─────────────────────────────────────────────────
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  ).run(key, value)
+}
+
+export function getApiKey(): string | null {
+  return getSetting('api_key')
+}
+
+export function setApiKey(value: string): void {
+  setSetting('api_key', value)
 }

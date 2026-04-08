@@ -1,16 +1,12 @@
 import { app, BrowserWindow, screen } from 'electron'
 import path from 'path'
-import { config } from 'dotenv'
 import { registerIpcHandlers } from './ipc'
 import { registerShortcut } from './shortcut'
 import { createTray } from './tray'
 import { setupAutoUpdater } from './updater'
 import * as db from './db'
-import { createOverlayWindow, registerTranslateShortcut } from './overlay'
+import { createOverlayWindow, registerTranslateShortcut, registerOverlayToggleShortcut } from './overlay'
 import { initSelectionHook } from './text-bridge'
-
-// Carrega variáveis de ambiente para o main process (VITE_GROQ_API_KEY etc.)
-config()
 
 const isDev = !app.isPackaged
 
@@ -55,6 +51,7 @@ function createWindow() {
   initSelectionHook()
   const overlay = createOverlayWindow()
   registerTranslateShortcut(overlay)
+  registerOverlayToggleShortcut(overlay)
 
   createTray(win, overlay)
 }

@@ -7,6 +7,7 @@ import { ExamplesView } from './ExamplesView'
 import { SynonymsView } from './SynonymsView'
 import { SavedWords } from './SavedWords'
 import { HistoryList } from './HistoryList'
+import { SettingsView } from './SettingsView'
 
 interface ContentAreaProps {
   view: SidebarView
@@ -87,6 +88,11 @@ export function ContentArea({
           onRemove={onRemoveFromHistory}
         />
       )}
+
+      {view === 'settings' && (
+        <SettingsView />
+      )}
     </div>
   )
 }
+
