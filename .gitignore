@@ -42,6 +42,9 @@ node_modules/
 /playwright/.auth/
 .playwright-mcp
 
+# git worktrees
+.worktrees/
+
 #mcp
 .mcp.json
 .claude/settings.local.json
