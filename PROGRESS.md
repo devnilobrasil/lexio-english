@@ -220,7 +220,81 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 
 ---
 
+## Fase 4 — Janelas, Atalhos e System Tray
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `Cargo.toml` | Adicionou `tauri-plugin-global-shortcut = "2"` | ✅ |
+| `tauri.conf.json` | Registrou `"plugins": { "global-shortcut": {} }` | ✅ |
+| `commands/window.rs` | `close_window`, `minimize_window`, `resize_window`, `get_app_version` + 2 testes | ✅ |
+| `commands/mod.rs` | Adicionou `pub mod window` | ✅ |
+| `commands/words.rs` | Removeu `get_app_version` (movido para `window.rs`) | ✅ |
+| `shortcuts.rs` | `Ctrl+Alt+E` (toggle main), `Ctrl+Alt+O` (toggle overlay), reposicionamento no monitor | ✅ |
+| `tray.rs` | System tray com menu: Show Lexio, Show Overlay, Quit + left-click handler | ✅ |
+| `main.rs` | Plugin registrado, shortcuts e tray no `.setup()`, commands de janela no invoke_handler | ✅ |
+| `useWindowControls.ts` | Novo hook: `close`, `minimize`, `resize` via `invoke` | ✅ |
+| `WindowControls.tsx` | Migrado de `window.lexio.*` para `useWindowControls` hook | ✅ |
+| `AppShell.tsx` | `transitionTo` usa `resize` do hook em vez de `window.lexio.resizeWindow` | ✅ |
+| `useAutoUpdater.ts` | Migrado de `window.lexio.onUpdate*` para `listen` do `@tauri-apps/api/event` | ✅ |
+
+### Arquivos criados
+
+- `src/tauri/src/commands/window.rs` — window commands + 2 testes
+- `src/tauri/src/shortcuts.rs` — atalhos globais Ctrl+Alt+E e Ctrl+Alt+O
+- `src/tauri/src/tray.rs` — system tray com menu
+- `src/renderer/hooks/useWindowControls.ts` — hook de controle de janela
+
+### Arquivos modificados
+
+- `src/tauri/Cargo.toml` — adicionou `tauri-plugin-global-shortcut`
+- `src/tauri/tauri.conf.json` — registrou plugin global-shortcut
+- `src/tauri/src/commands/mod.rs` — adicionou `pub mod window`
+- `src/tauri/src/commands/words.rs` — removeu `get_app_version`
+- `src/tauri/src/main.rs` — plugin, shortcuts, tray, novos commands
+- `src/renderer/components/WindowControls.tsx` — usa `useWindowControls`
+- `src/renderer/components/AppShell.tsx` — usa `resize` do hook
+- `src/renderer/hooks/useAutoUpdater.ts` — usa `listen` do Tauri
+
+### Testes unitários (2 novos, 25 total)
+
+| Teste | Arquivo |
+|---|---|
+| `test_resize_state_mapping` | `commands/window.rs` |
+| `test_resize_invalid_state_ignored` | `commands/window.rs` |
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `Ctrl+Alt+E` abre/fecha a janela main e reposiciona no centro | ✅ Implementado em `shortcuts.rs` |
+| `Ctrl+Alt+O` toggle o overlay | ✅ Implementado em `shortcuts.rs` |
+| Botão fechar chama `invoke('close_window')` e esconde a janela | ✅ `WindowControls.tsx` via hook |
+| Botão minimizar funciona | ✅ `WindowControls.tsx` via hook |
+| `invoke('resize_window', { state: 'result' })` → 420px | ✅ `AppShell.tsx` via hook |
+| `invoke('resize_window', { state: 'idle' })` → 60px | ✅ `AppShell.tsx` via hook |
+| System tray aparece com ícone e menu correto | ✅ `tray.rs` — Show Lexio, Show Overlay, Quit |
+| "Quit" no tray fecha o app | ✅ `app.exit(0)` |
+| "Show Lexio" no tray traz a janela de volta | ✅ `win.show()` + `set_focus()` |
+| `cargo test` passa | ✅ Confirmado pelo usuário — 25/25 testes |
+| `npm run build:renderer` passa sem erros | ✅ 159 módulos, zero erros |
+| Zero `window.lexio.*` no renderer | ✅ Confirmado via grep |
+| `npm run dev` abre app com shortcuts funcionais | ✅ Confirmado pelo usuário — Ctrl+Alt+E e Ctrl+Alt+O funcionam |
+
+### Decisões
+
+1. **`get_app_version` movido para `commands/window.rs`** — Era em `words.rs` (errado conceitualmente). Movido para `window.rs` onde pertence. Command name permanece igual — nenhuma mudança no frontend.
+
+2. **`useAutoUpdater.ts` preparado para Fase 5** — Substituiu `window.lexio.onUpdate*` por `listen('update:available', ...)` do Tauri. O `install_update` command ainda não existe no backend Rust (Fase 5). O hook está preparado mas inativo até a Fase 5.
+
+3. **Reposicionamento no monitor via `current_monitor()`** — O Tauri v2 não expõe diretamente o monitor sob o cursor. Fallback: usa `current_monitor()` da janela (o monitor onde a janela estava quando minimizada). Alternativa mais precisa possível com a API disponível.
+
+---
+
 ## Próximas Fases
 
-- **Fase 4** — Shortcuts globais, system tray, overlay em Tauri
 - **Fase 5** — Auto-updater, build/release pipeline, cleanup do backup Electron

@@ -47,6 +47,9 @@
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     }
   },
+  "plugins": {
+    "global-shortcut": null
+  },
   "bundle": {
     "active": true,
     "targets": "all",

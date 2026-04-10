@@ -3,7 +3,9 @@
 mod ai_client;
 mod commands;
 mod db;
+mod shortcuts;
 mod state;
+mod tray;
 mod types;
 
 use rusqlite::Connection;
@@ -12,6 +14,7 @@ use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let db_path = db::get_db_path(app.handle());
             if let Some(parent) = db_path.parent() {
@@ -20,10 +23,14 @@ fn main() {
             let conn = Connection::open(&db_path).expect("failed to open database");
             db::init(&conn).expect("failed to initialize database");
             app.manage(AppState::new(conn));
+
+            shortcuts::register_all(app.handle());
+            tray::create_tray(app.handle())?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::words::get_word,
+            // Phase 2 — DB + Settings
             commands::words::get_history,
             commands::words::get_saved,
             commands::words::save_word,
@@ -33,7 +40,15 @@ fn main() {
             commands::words::unsave_word,
             commands::words::get_api_key,
             commands::words::set_api_key,
-            commands::words::get_app_version,
+            // Phase 3 — AI (async)
+            commands::words::get_word,
+            // Phase 4 — Window controls
+            commands::window::close_window,
+            commands::window::minimize_window,
+            commands::window::resize_window,
+            commands::window::get_app_version,
+            commands::window::overlay_set_position,
+            commands::window::overlay_drag_start,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

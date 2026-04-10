@@ -100,8 +100,3 @@ pub fn set_api_key(key: String, state: State<'_, AppState>) -> Result<(), String
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     db_settings::set_api_key(&conn, &key).map_err(|e| e.to_string())
 }
-
-#[tauri::command]
-pub fn get_app_version(app: tauri::AppHandle) -> String {
-    app.package_info().version.to_string()
-}
