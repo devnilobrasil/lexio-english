@@ -1,6 +1,7 @@
 // src/renderer/components/SettingsView.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { invoke } from '../lib/tauri-bridge'
 
 export function SettingsView() {
   const { t } = useTranslation()
@@ -11,10 +12,10 @@ export function SettingsView() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    window.lexio.getApiKey().then((key) => {
+    invoke<string | null>('get_api_key').then((key) => {
       if (key) setApiKey(key)
     })
-    window.lexio.getAppVersion().then(setVersion)
+    invoke<string>('get_app_version').then(setVersion)
   }, [])
 
   const maskedKey = apiKey
@@ -25,7 +26,7 @@ export function SettingsView() {
     if (!apiKey.trim()) return
     setStatus('saving')
     try {
-      await window.lexio.setApiKey(apiKey.trim())
+      await invoke<void>('set_api_key', { key: apiKey.trim() })
       setStatus('saved')
       setTimeout(() => setStatus('idle'), 2000)
     } catch {

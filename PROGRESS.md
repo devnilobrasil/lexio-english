@@ -14,7 +14,7 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 | Passo | Descrição | Status |
 |---|---|---|
 | Rust backend | Criou `src/tauri/Cargo.toml`, `build.rs`, `src/main.rs` mínimo | ✅ |
-| `tauri.conf.json` | Criou na raiz com janelas `main` (600×60) e `overlay` (48×48), CSP e bundle config | ✅ |
+| `tauri.conf.json` | Criou em `src/tauri/tauri.conf.json` com janelas `main` (600×60) e `overlay` (48×48), CSP e bundle config | ✅ |
 | `package.json` | Substituiu scripts Electron por `tauri dev`/`tauri build`; removeu `electron`, `electron-builder`, `electron-updater`, `better-sqlite3`, `@nut-tree-fork/nut-js`, `selection-hook`; adicionou `@tauri-apps/cli`, `@tauri-apps/api` | ✅ |
 | `vite.config.ts` | Adicionou `host: 'localhost'`, `envPrefix: ['VITE_', 'TAURI_']`, `define: { __TAURI__ }` | ✅ |
 | `tauri-bridge.ts` | Criou `src/renderer/lib/tauri-bridge.ts` — wrapper sobre `invoke`/`listen` | ✅ |
@@ -24,11 +24,12 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 
 ### Arquivos criados
 
+- `Cargo.toml` (workspace na raiz, contém `members = ["src/tauri"]`)
 - `src/tauri/Cargo.toml`
 - `src/tauri/build.rs`
 - `src/tauri/src/main.rs`
-- `src/tauri/icons/` (32x32.png, 128x128.png, 128x128@2x.png, icon.icns, icon.ico + formatos mobile)
-- `tauri.conf.json`
+- `src/tauri/tauri.conf.json` (configuração Tauri com janelas e bundle)
+- `src/tauri/icons/` (32x32.png, 128x128.png, 128x128@2x.png, icon.icns, icon.ico + formatos mobile/Android/iOS)
 - `src/renderer/lib/tauri-bridge.ts`
 - `_electron_backup/main/` (cópia do main Electron)
 - `_electron_backup/preload/` (cópia do preload Electron)
@@ -44,58 +45,12 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 | Critério | Resultado |
 |---|---|
 | `npm run build:renderer` passa sem erros TypeScript | ✅ Verificado — 155 módulos transformados, zero erros |
-| `cargo check` passa (sem erros Rust) | ⏳ Aguardando teste do usuário (guide abaixo) |
+| `cargo check` passa (sem erros Rust) | ✅ Verificado pelo usuário — `Finished check` com sucesso |
 | App Tauri abre com `npm run dev` | ✅ Verificado pelo usuário — ambas as janelas aparecem |
 | Janela `main` (600×60) aparece, transparente, sem borda | ✅ Confirmado pelo usuário |
 | Janela `overlay` (48×48) aparece | ✅ Confirmado pelo usuário |
 | Frontend React renderiza na janela main | ✅ Confirmado pelo usuário |
 | Zero referências a `electron` causam crash | ✅ Confirmado — app roda sem erros |
-
-### Como Testar `cargo check` (Guia Passo-a-Passo)
-
-O `cargo check` **não compila o app**, apenas verifica se o código Rust está correto (sem erros de sintaxe, tipos, etc.). É muito mais rápido que um build completo — ~30-60 segundos na primeira run (download das dependências).
-
-#### Passo 1: Abra um terminal
-
-```bash
-# Certifique-se de que você está no worktree:
-cd /path/to/lexio/.worktrees/migrate-to-tauri
-```
-
-#### Passo 2: Execute `cargo check` a partir da raiz do worktree
-
-```bash
-# Da raiz do worktree (não precisa entrar em src/tauri/)
-cargo check -p lexio
-```
-
-**Esperado:** você vê logs como:
-```
-   Compiling lexio v0.1.0
-    Checking lexio v0.1.0
-     Finished check [unoptimized + debuginfo] target(s) in 45.23s
-```
-
-Se tudo passar, você verá `✓ Finished` no fim. **Não há erro.**
-
-#### Passo 4: Possíveis erros (e soluções)
-
-| Erro | Solução |
-|---|---|
-| `cargo: command not found` | Rust não instalado. Execute `rustup` (já deve estar em PATH) |
-| `error: failed to resolve: use of undeclared type...` | Erro no código Rust. Me mostre o erro completo |
-| `error: could not compile...` | Dependência faltando. Execute `cargo update` e tente novamente |
-| Leva **mais de 2 minutos** | Normal na 1ª run (download crates). Próximas runs são <5s |
-
-#### Passo 5: Se passar, confirme para mim
-
-```
-✅ `cargo check` passou
-```
-
-Aí eu atualizo o PROGRESS.md.
-
----
 
 ### Dificuldades e decisões
 
@@ -109,10 +64,86 @@ Aí eu atualizo o PROGRESS.md.
 
 ---
 
+---
+
+## Fase 2 — Backend Rust: DB + Settings
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `Cargo.toml` | Adicionou `rusqlite` (bundled) e `tokio` | ✅ |
+| `types.rs` | Structs Rust com serde: `Word`, `AIWordResponse`, `MeaningEntry`, `VerbForms`, `WordExample` | ✅ |
+| `state.rs` | `AppState` com `Mutex<Connection>` | ✅ |
+| `db/mod.rs` | `init()`: schema + migrations (replica exata do `db.ts`) | ✅ |
+| `db/words.rs` | `get_word`, `upsert_word`, `toggle_saved`, `delete_word`, `remove_from_history`, `unsave_word`, `get_history`, `get_saved` + 11 testes unitários | ✅ |
+| `db/settings.rs` | `get_setting`, `set_setting`, `get_api_key`, `set_api_key` + 3 testes unitários | ✅ |
+| `commands/words.rs` | 11 Tauri commands delegando para `db/` | ✅ |
+| `main.rs` | `AppState` inicializado no `.setup()`, todos os commands registrados | ✅ |
+| Hooks migrados | `useWords.ts`, `useSearch.ts`, `ai.ts`, `SettingsView.tsx` migrados de `window.lexio.*` para `invoke(...)` | ✅ |
+
+### Arquivos criados
+
+- `src/tauri/src/types.rs`
+- `src/tauri/src/state.rs`
+- `src/tauri/src/db/mod.rs`
+- `src/tauri/src/db/words.rs`
+- `src/tauri/src/db/settings.rs`
+- `src/tauri/src/commands/mod.rs`
+- `src/tauri/src/commands/words.rs`
+
+### Arquivos modificados
+
+- `src/tauri/Cargo.toml` — adicionou `rusqlite` e `tokio`
+- `src/tauri/src/main.rs` — wired AppState, DB init, 11 commands
+- `src/renderer/hooks/useWords.ts` — migrado para `invoke`
+- `src/renderer/hooks/useSearch.ts` — migrado para `invoke`
+- `src/renderer/lib/ai.ts` — `getApiKey` via `invoke`
+- `src/renderer/components/SettingsView.tsx` — `getApiKey`, `setApiKey`, `getAppVersion` via `invoke`
+
+### Testes unitários (14 total)
+
+| Teste | Arquivo |
+|---|---|
+| `test_upsert_and_get_word` | `db/words.rs` |
+| `test_get_word_case_insensitive` | `db/words.rs` |
+| `test_get_word_missing_locale_returns_none` | `db/words.rs` |
+| `test_toggle_saved` | `db/words.rs` |
+| `test_json_serialization_roundtrip` | `db/words.rs` |
+| `test_get_history_respects_in_history` | `db/words.rs` |
+| `test_delete_word` | `db/words.rs` |
+| `test_unsave_word` | `db/words.rs` |
+| `test_get_saved` | `db/words.rs` |
+| `test_meanings_roundtrip` | `db/words.rs` |
+| `test_upsert_updates_existing_word` | `db/words.rs` |
+| `test_api_key_roundtrip` | `db/settings.rs` |
+| `test_setting_upsert` | `db/settings.rs` |
+| `test_get_missing_setting` | `db/settings.rs` |
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `cargo test` passa com 0 falhas | ✅ 14/14 testes passando |
+| `npm run build:renderer` passa sem erros | ✅ 155 módulos, zero erros |
+| Zero `any` no TypeScript dos hooks migrados | ✅ Todos os invokes tipados explicitamente |
+| Lifetime error no `db/mod.rs` (`stmt` borrow) | ✅ Corrigido — `collect()` separado em binding antes de fechar o bloco |
+
+### Dificuldades e decisões
+
+1. **Lifetime error `E0597` em `migrate_old_meanings`** — O `MappedRows` iterator borrow `stmt`, mas `stmt` era dropped antes do iterator ser consumido ao final do bloco. Correção: separar o `collect()` em uma binding local (`let mapped = ...`) antes de fechar o bloco, permitindo que `stmt` seja dropped após o iterator.
+
+2. **`useAutoUpdater.ts` não migrado** — Os eventos de auto-update (`onUpdateAvailable`, `onUpdateProgress`, `onUpdateDownloaded`, `installUpdate`) não existem ainda no backend Rust. Este hook permanece apontando para `window.lexio.*` e será migrado na Fase 5/6.
+
+3. **`SettingsView.tsx` chamava IPC diretamente** — Violação pré-existente da regra "IPC só em hooks". Migrado para `invoke` mantendo a mesma estrutura; não foi criado hook de settings separado pois está fora do escopo da Fase 2.
+
+---
+
 ## Próximas Fases
 
-- **Fase 2** — IPC básico: AppState com SQLite (rusqlite), primeiros commands Rust
-- **Fase 3** — Migrar `getWord`, `saveWord`, `getHistory` do Electron para commands Rust
-- **Fase 4** — AI client em Rust (Groq API), remover `ai.ts` do renderer
-- **Fase 5** — Shortcuts globais, system tray, overlay em Tauri
-- **Fase 6** — Auto-updater, build/release pipeline, cleanup do backup Electron
+- **Fase 3** — AI client em Rust (Groq API), remover `ai.ts` do renderer
+- **Fase 4** — Shortcuts globais, system tray, overlay em Tauri
+- **Fase 5** — Auto-updater, build/release pipeline, cleanup do backup Electron

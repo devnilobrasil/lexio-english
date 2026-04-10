@@ -1,7 +1,8 @@
 // src/renderer/hooks/useSearch.ts
 import { useState } from 'react'
-import type { Word } from '../../types'
+import type { Word, AIWordResponse } from '../../types'
 import { fetchWordFromAI } from '../lib/ai'
+import { invoke } from '../lib/tauri-bridge'
 import { useLocale } from './useLocale'
 
 export function useSearch() {
@@ -21,7 +22,7 @@ export function useSearch() {
 
     try {
       // 1. Tenta cache local para este locale
-      const localWord = await window.lexio.getWord(trimmed, locale)
+      const localWord = await invoke<Word | null>('get_word', { word: trimmed, locale })
 
       if (localWord) {
         setWord(localWord)
@@ -33,7 +34,7 @@ export function useSearch() {
       const aiResponse = await fetchWordFromAI(trimmed, locale)
 
       // 3. Salva no DB com o locale
-      const savedWord = await window.lexio.saveWord(aiResponse, locale)
+      const savedWord = await invoke<Word>('save_word', { data: aiResponse as AIWordResponse, locale })
 
       setWord(savedWord)
     } catch (err: unknown) {
@@ -49,7 +50,7 @@ export function useSearch() {
   const toggleSaved = async () => {
     if (!word) return
     try {
-      const updated = await window.lexio.toggleSaved(word.word)
+      const updated = await invoke<Word>('toggle_saved', { word: word.word })
       setWord(updated)
     } catch (err) {
       console.error('Toggle saved error:', err)

@@ -1,5 +1,6 @@
 // src/renderer/lib/ai.ts
 import type { AIWordResponse, Locale } from '../../types'
+import { invoke } from './tauri-bridge'
 
 const SYSTEM_PROMPT = `You are an expert English lexicographer and language teacher specialized in helping non-native speakers truly understand and retain English vocabulary.
 
@@ -74,7 +75,7 @@ Other rules:
 ${LOCALE_INSTRUCTIONS[locale]}`
 
 export async function fetchWordFromGroq(word: string, locale: Locale): Promise<AIWordResponse> {
-  const apiKey = await window.lexio.getApiKey()
+  const apiKey = await invoke<string | null>('get_api_key')
   if (!apiKey) throw new Error('API key not configured. Please set it in Settings.')
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
