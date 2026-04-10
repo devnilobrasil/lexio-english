@@ -1,7 +1,6 @@
 // src/renderer/hooks/useSearch.ts
 import { useState } from 'react'
-import type { Word, AIWordResponse } from '../../types'
-import { fetchWordFromAI } from '../lib/ai'
+import type { Word } from '../../types'
 import { invoke } from '../lib/tauri-bridge'
 import { useLocale } from './useLocale'
 
@@ -21,24 +20,11 @@ export function useSearch() {
     setError(null)
 
     try {
-      // 1. Tenta cache local para este locale
-      const localWord = await invoke<Word | null>('get_word', { word: trimmed, locale })
-
-      if (localWord) {
-        setWord(localWord)
-        setLoading(false)
-        return
-      }
-
-      // 2. Busca na IA com o locale ativo
-      const aiResponse = await fetchWordFromAI(trimmed, locale)
-
-      // 3. Salva no DB com o locale
-      const savedWord = await invoke<Word>('save_word', { data: aiResponse as AIWordResponse, locale })
-
-      setWord(savedWord)
+      // get_word handles everything: DB cache → Gemini → auto-save
+      const result = await invoke<Word | null>('get_word', { word: trimmed, locale })
+      setWord(result)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ocorreu um erro ao buscar a palavra.'
+      const message = err instanceof Error ? err.message : String(err)
       console.error('Search error:', err)
       setError(message)
       setWord(null)

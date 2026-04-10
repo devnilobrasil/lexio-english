@@ -1,16 +1,42 @@
+use crate::ai_client;
 use crate::db::{settings as db_settings, words as db_words};
 use crate::state::AppState;
 use crate::types::{AIWordResponse, Word};
 use tauri::State;
 
 #[tauri::command]
-pub fn get_word(
+pub async fn get_word(
     word: String,
     locale: String,
     state: State<'_, AppState>,
 ) -> Result<Option<Word>, String> {
-    let conn = state.db.lock().map_err(|e| e.to_string())?;
-    db_words::get_word(&conn, &word, &locale).map_err(|e| e.to_string())
+    // 1. Try SQLite cache
+    let cached = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db_words::get_word(&conn, &word, &locale).map_err(|e| e.to_string())?
+    };
+
+    if cached.is_some() {
+        return Ok(cached);
+    }
+
+    // 2. Cache miss — get API key
+    let api_key = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db_settings::get_api_key(&conn).map_err(|e| e.to_string())?
+    };
+    let api_key = api_key.ok_or("API key not configured. Please set it in Settings.")?;
+
+    // 3. Call Gemini
+    let ai_response = ai_client::fetch_word(&state.http, &api_key, &word, &locale).await?;
+
+    // 4. Auto-save to SQLite
+    let saved = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db_words::upsert_word(&conn, &ai_response, &locale).map_err(|e| e.to_string())?
+    };
+
+    Ok(Some(saved))
 }
 
 #[tauri::command]

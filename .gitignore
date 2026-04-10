@@ -51,3 +51,8 @@ node_modules/
 .claude/implementation_plan.md
 .claude/plan_rich_prompt.md
 .claude/pre-plan.md
+/target
+/Cargo.lock
+src/tauri/Cargo.lock
+src/tauri/target/
+src/tauri/gen/

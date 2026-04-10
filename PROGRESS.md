@@ -142,8 +142,85 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 
 ---
 
+## Fase 3 — Backend Rust: AI Client (Gemini) — Word Lookup
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `Cargo.toml` | Adicionou `reqwest` (json, rustls-tls) | ✅ |
+| `state.rs` | Adicionou `http: Client` ao `AppState` (reutilizável, timeout 30s) | ✅ |
+| `ai_client/config.rs` | Constantes de provider: endpoint Gemini OpenAI-compat, modelo `gemini-2.0-flash` | ✅ |
+| `ai_client/word_prompt.rs` | System prompt + `build_user_prompt()` portados de `ai.ts` (prompts idênticos) | ✅ |
+| `ai_client/mod.rs` | Cliente HTTP Gemini: structs de request/response, `fetch_word()` async + 9 testes | ✅ |
+| `commands/words.rs` | `get_word` agora é async: cache hit → retorna; cache miss → Gemini → auto-save → retorna | ✅ |
+| `main.rs` | Adicionou `mod ai_client` | ✅ |
+| `ai.ts` deletado | Removido `src/renderer/lib/ai.ts` e `ai.test.ts` | ✅ |
+| `useSearch.ts` simplificado | Uma única chamada `invoke('get_word', ...)` — backend faz tudo | ✅ |
+| CSP limpo | Sem domínios de API externos (chamadas saem do Rust, não do renderer) | ✅ |
+
+### Arquivos criados
+
+- `src/tauri/src/ai_client/mod.rs` — cliente HTTP Gemini + structs + 9 testes unitários
+- `src/tauri/src/ai_client/config.rs` — constantes de endpoint e modelo
+- `src/tauri/src/ai_client/word_prompt.rs` — system prompt e build_user_prompt portados de ai.ts
+
+### Arquivos modificados
+
+- `src/tauri/Cargo.toml` — adicionou `reqwest`
+- `src/tauri/src/state.rs` — `AppState` com `http: Client`
+- `src/tauri/src/main.rs` — adicionou `mod ai_client`
+- `src/tauri/src/commands/words.rs` — `get_word` agora async com cache miss → Gemini → auto-save
+- `src/renderer/hooks/useSearch.ts` — simplificado para uma única chamada `invoke`
+
+### Arquivos deletados
+
+- `src/renderer/lib/ai.ts` — chamava GROQ no renderer (substituído por Rust)
+- `src/renderer/lib/ai.test.ts` — testes de parse migrados para Rust
+
+### Testes unitários (9 novos, 23 total)
+
+| Teste | Arquivo |
+|---|---|
+| `test_model_is_gemini` | `ai_client/mod.rs` |
+| `test_locale_name_pt_br` | `ai_client/mod.rs` |
+| `test_locale_name_es` | `ai_client/mod.rs` |
+| `test_locale_name_unknown_falls_back_to_english` | `ai_client/mod.rs` |
+| `test_build_user_prompt_contains_word` | `ai_client/mod.rs` |
+| `test_build_user_prompt_es_contains_spanish` | `ai_client/mod.rs` |
+| `test_parse_ai_response_valid_json` | `ai_client/mod.rs` |
+| `test_parse_ai_response_invalid_json_errors` | `ai_client/mod.rs` |
+| `test_parse_ai_response_with_full_meanings` | `ai_client/mod.rs` |
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `cargo test` passa (incluindo `test_model_is_gemini`) | ✅ Confirmado pelo usuário — 23/23 testes |
+| Cache hit retorna imediatamente (sem chamada Gemini) | ✅ Lógica implementada — `get_word` retorna early se `cached.is_some()` |
+| Cache miss chama Gemini, salva, retorna Word completa | ✅ Fluxo: DB miss → get API key → `fetch_word` → `upsert_word` → return |
+| `ai.ts` deletado — `npm run build:renderer` passa sem erros | ✅ 158 módulos, zero erros |
+| `useSearch.ts` não importa mais nada de `ai.ts` | ✅ Confirmado via grep |
+| API key nunca aparece em logs do renderer | ✅ Key é lida e usada inteiramente em Rust |
+| CSP limpo — sem domínios de API externos | ✅ `default-src 'self'` — chamadas saem do Rust |
+| Nenhuma referência a `groq` no código Rust | ✅ Apenas mensagem de assert no teste |
+
+### Decisões
+
+1. **GROQ → Gemini** — O endpoint OpenAI-compatible do Gemini (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`) aceita o mesmo payload que o GROQ. Mudança mínima: apenas endpoint e modelo.
+
+2. **`save_word` command mantido** — O comando `save_word` permanece registrado no invoke_handler, mesmo que `useSearch.ts` não o chame mais diretamente (o fluxo agora é via `get_word` async). Manter para uso futuro se necessário.
+
+3. **API key no Rust, não no renderer** — Antes: renderer lia a key via `invoke('get_api_key')`, passava para `ai.ts` que chamava GROQ. Depois: renderer apenas chama `invoke('get_word')`, e o Rust lê a key internamente. A key nunca sai do backend.
+
+4. **MutexGuard liberado antes de cada `.await`** — O `get_word` async usa blocos `{ }` para garantir que o lock do DB é liberado antes de qualquer ponto de await (chamada HTTP). Sem isso, deadlock é garantido.
+
+---
+
 ## Próximas Fases
 
-- **Fase 3** — AI client em Rust (Groq API), remover `ai.ts` do renderer
 - **Fase 4** — Shortcuts globais, system tray, overlay em Tauri
 - **Fase 5** — Auto-updater, build/release pipeline, cleanup do backup Electron
