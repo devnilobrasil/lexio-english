@@ -1,7 +1,9 @@
 pub mod config;
+pub mod translate_prompt;
 pub mod word_prompt;
 
 use crate::ai_client::config::{AI_BASE_URL, AI_MODEL};
+use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
 use crate::ai_client::word_prompt::{build_user_prompt, SYSTEM_PROMPT};
 use crate::types::AIWordResponse;
 use reqwest::Client;
@@ -93,6 +95,50 @@ pub async fn fetch_word(
         .map_err(|e| format!("Failed to parse AI response JSON: {}", e))
 }
 
+/// Translates `text` to English using the Gemini OpenAI-compatible endpoint.
+/// Returns plain text (no JSON wrapping).
+pub async fn fetch_translation(
+    client: &Client,
+    api_key: &str,
+    text: &str,
+) -> Result<String, String> {
+    let request = serde_json::json!({
+        "model": AI_MODEL,
+        "messages": [
+            { "role": "system", "content": TRANSLATE_SYSTEM_PROMPT },
+            { "role": "user", "content": text }
+        ]
+    });
+
+    let response = client
+        .post(AI_BASE_URL)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP error: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Gemini translation error {}: {}", status, body));
+    }
+
+    let chat: ChatResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    let content = chat
+        .choices
+        .first()
+        .map(|c| c.message.content.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or("Empty response from Gemini translation")?;
+
+    Ok(content)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ai_client::config::AI_MODEL;
@@ -157,6 +203,40 @@ mod tests {
         let bad_json = r#"not valid json"#;
         let result: Result<crate::types::AIWordResponse, _> = serde_json::from_str(bad_json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_translate_prompt_is_non_empty() {
+        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
+        assert!(!TRANSLATE_SYSTEM_PROMPT.is_empty());
+    }
+
+    #[test]
+    fn test_translate_prompt_targets_english() {
+        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
+        assert!(TRANSLATE_SYSTEM_PROMPT.to_lowercase().contains("english"));
+    }
+
+    #[test]
+    fn test_translate_prompt_forbids_explanations() {
+        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
+        // The prompt must require the model to return ONLY the translation.
+        assert!(TRANSLATE_SYSTEM_PROMPT.to_lowercase().contains("only"));
+    }
+
+    #[test]
+    fn test_parse_translation_response_extracts_content() {
+        // Reuses the same ChatResponse struct — simulate what Gemini returns
+        // for a translation call.
+        let json = r#"{
+            "choices": [
+                { "message": { "content": "The cat sat on the mat." } }
+            ]
+        }"#;
+        let parsed: Result<super::ChatResponse, _> = serde_json::from_str(json);
+        assert!(parsed.is_ok());
+        let chat = parsed.unwrap();
+        assert_eq!(chat.choices[0].message.content, "The cat sat on the mat.");
     }
 
     #[test]

@@ -356,6 +356,117 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 
 ---
 
+## Fase 5 — Overlay Translation Flow
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete (pending manual verification with `cargo test` + `npm run dev`)
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `Cargo.toml` | Adicionou `arboard = "3"` e `enigo = "0.2"` | ✅ |
+| `ai_client/translate_prompt.rs` | Criou — prompt de tradução (target: English, retorna APENAS o texto) | ✅ |
+| `ai_client/mod.rs` | Adicionou `fetch_translation` (POST Gemini sem `response_format`, retorna texto puro) | ✅ |
+| `text_bridge.rs` | Criou — `capture_selection` (Ctrl+C + arboard + restore) e `inject_text` (arboard + Ctrl+V + restore) | ✅ |
+| `commands/overlay.rs` | Criou — `do_translate` (lógica async compartilhada) + command `overlay_translate` | ✅ |
+| `commands/mod.rs` | Adicionou `pub mod overlay` | ✅ |
+| `commands/window.rs` | Persistência: `persist_overlay_position` + `load_overlay_position` em `<app_data_dir>/overlay-position.json`; `overlay_set_position` agora persiste | ✅ |
+| `shortcuts.rs` | Registrou `Ctrl+Alt+T` → spawna `do_translate` no runtime tokio | ✅ |
+| `main.rs` | Declarou `mod text_bridge`, registrou `overlay_translate` no invoke_handler, carrega posição persistida no setup | ✅ |
+| `preload/overlay-preload.ts` | Deletado — não é mais usado (useOverlay.ts já migrado na Fase 4.1) | ✅ |
+
+### Arquivos criados
+
+- `src/tauri/src/ai_client/translate_prompt.rs`
+- `src/tauri/src/text_bridge.rs`
+- `src/tauri/src/commands/overlay.rs`
+
+### Arquivos modificados
+
+- `src/tauri/Cargo.toml` — `arboard`, `enigo`
+- `src/tauri/src/ai_client/mod.rs` — `pub mod translate_prompt` + `fetch_translation`
+- `src/tauri/src/commands/mod.rs` — `pub mod overlay`
+- `src/tauri/src/commands/window.rs` — persistência de posição do overlay
+- `src/tauri/src/shortcuts.rs` — registrou Ctrl+Alt+T
+- `src/tauri/src/main.rs` — módulo `text_bridge`, carrega posição salva, registra `overlay_translate`
+
+### Arquivos deletados
+
+- `src/preload/overlay-preload.ts` — API obsoleta do Electron (contextBridge)
+
+### Fluxo do `do_translate`
+
+```
+Ctrl+Alt+T → spawn async task →
+  1. emit "loading"
+  2. spawn_blocking(capture_selection) → Ctrl+C + arboard + 80ms
+     • None → emit "idle", return (silencioso)
+     • Err  → emit "error", emit error message
+  3. lock DB, get_api_key, drop lock
+     • None → emit "error", "API key not configured"
+  4. clone http client (Arc-cheap), fetch_translation (await)
+  5. spawn_blocking(inject_text) → arboard + Ctrl+V + restore
+  6. emit "success" → sleep 2s → emit "idle"
+```
+
+**MutexGuard discipline:** todo `state.db.lock()` é feito em bloco `{ }` e o guard é dropped antes de qualquer `.await`. `spawn_blocking` é usado para capture/inject para não bloquear o runtime tokio com `thread::sleep`.
+
+### Testes unitários (8 novos, 34 total)
+
+| Teste | Arquivo |
+|---|---|
+| `test_translate_prompt_is_non_empty` | `ai_client/mod.rs` |
+| `test_translate_prompt_targets_english` | `ai_client/mod.rs` |
+| `test_translate_prompt_forbids_explanations` | `ai_client/mod.rs` |
+| `test_parse_translation_response_extracts_content` | `ai_client/mod.rs` |
+| `test_delay_constants_are_reasonable` | `text_bridge.rs` |
+| `test_overlay_position_json_roundtrip` | `commands/window.rs` |
+| `test_overlay_position_parse_rejects_malformed` | `commands/window.rs` |
+| `test_overlay_position_parse_missing_key` | `commands/window.rs` |
+
+Testes reais de clipboard/enigo são OS-dependentes (requerem display) — verificação via checklist manual abaixo.
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `cargo test` passa | ⏳ Aguardando execução manual |
+| `npm run build:renderer` passa sem erros | ✅ Zero erros |
+| `Ctrl+Alt+T` captura seleção e injeta tradução | ⏳ Teste manual |
+| Sem seleção → overlay volta para idle silenciosamente | ⏳ Teste manual |
+| Sem API key → overlay mostra error com mensagem | ⏳ Teste manual |
+| Clipboard do usuário restaurado após capture + inject | ⏳ Teste manual |
+| Overlay salva posição ao arrastar | ⏳ Teste manual |
+| Posição do overlay persiste entre reinicializações | ⏳ Teste manual |
+| `src/preload/overlay-preload.ts` deletado | ✅ Confirmado |
+| `Ctrl+Alt+E` e `Ctrl+Alt+O` ainda funcionam (regressão) | ⏳ Teste manual |
+
+### Checklist manual pós-build
+
+- [ ] Selecionar texto em Notepad, pressionar Ctrl+Alt+T → tradução injetada
+- [ ] Selecionar texto em browser, pressionar Ctrl+Alt+T → tradução injetada
+- [ ] Double-click no overlay com seleção ativa → tradução injetada
+- [ ] Arrastar overlay, fechar app, reabrir → overlay aparece na posição salva
+- [ ] Sem API key configurada, Ctrl+Alt+T → overlay fica vermelho (error)
+- [ ] Sem seleção, Ctrl+Alt+T → overlay volta para idle sem alarde
+
+### Decisões
+
+1. **`do_translate` como função compartilhada** — O mesmo código roda via command (`overlay_translate` chamado pelo double-click no overlay) e via shortcut (`Ctrl+Alt+T`). Extraído para `pub async fn do_translate(app: AppHandle)` em `commands/overlay.rs`; o command é um wrapper fino.
+
+2. **`spawn_blocking` para capture/inject** — `capture_selection` e `inject_text` usam `thread::sleep` (não `tokio::time::sleep`) porque são sync. Chamá-los diretamente de uma task async bloqueia o worker tokio. `spawn_blocking` os offloada para o thread pool blocking.
+
+3. **Clipboard restore best-effort** — Se o restore do clipboard falhar (raro), ignoramos silenciosamente. O fluxo primário (tradução injetada) não deve falhar por causa disso.
+
+4. **Persistência por write-per-drag** — `overlay_set_position` escreve o arquivo JSON a cada chamada (uma por mousemove durante o drag). Overhead é ~20 bytes × ~60Hz = trivial em SSDs modernos. Otimização com debounce pode ser feita depois se for detectado impacto.
+
+5. **`app_data_dir` como storage** — Mesma pasta do SQLite (`lexio.db`). O Tauri resolve isso via `app.path().app_data_dir()` → `%APPDATA%\Lexio\` no Windows.
+
+6. **TRADEOFF vs selection-hook (Electron)** — Documentado em `text_bridge.rs`: o selection-hook do Electron usava UIAutomation passivamente (sem keypress). Aqui simulamos Ctrl+C, o que pode ter side-effects em apps que interceptam esse atalho. Tradeoff aceito em troca de cross-platform real via `enigo`/`arboard`.
+
+---
+
 ## Próximas Fases
 
-- **Fase 5** — Overlay translate: clipboard capture + keyboard injection (`Ctrl+Alt+T`), auto-updater, build/release pipeline, cleanup do backup Electron
+- **Fase 6** — Auto-updater (tauri-plugin-updater), build/release pipeline, cleanup do `_electron_backup/` e `src/main/` antigos

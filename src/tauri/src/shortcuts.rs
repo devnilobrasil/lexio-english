@@ -1,9 +1,12 @@
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+use crate::commands::overlay::do_translate;
+
 pub fn register_all(app: &tauri::AppHandle) {
     register_main_toggle(app);
     register_overlay_toggle(app);
+    register_translate(app);
 }
 
 fn register_main_toggle(app: &tauri::AppHandle) {
@@ -60,6 +63,32 @@ fn register_overlay_toggle(app: &tauri::AppHandle) {
             } else {
                 overlay.show().ok();
             }
+        })
+        .ok();
+}
+
+fn register_translate(app: &tauri::AppHandle) {
+    let app_handle = app.clone();
+    let shortcut = if cfg!(target_os = "macos") {
+        "Command+Alt+T"
+    } else {
+        "Control+Alt+T"
+    };
+
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |_, _, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            let app = app_handle.clone();
+            // Spawn onto the tokio runtime so we don't block the shortcut
+            // dispatcher. `do_translate` uses spawn_blocking internally for
+            // the native clipboard/enigo work.
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = do_translate(app).await {
+                    eprintln!("[shortcut Ctrl+Alt+T] translate error: {}", e);
+                }
+            });
         })
         .ok();
 }

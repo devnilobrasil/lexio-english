@@ -5,6 +5,7 @@ mod commands;
 mod db;
 mod shortcuts;
 mod state;
+mod text_bridge;
 mod tray;
 mod types;
 
@@ -23,6 +24,13 @@ fn main() {
             let conn = Connection::open(&db_path).expect("failed to open database");
             db::init(&conn).expect("failed to initialize database");
             app.manage(AppState::new(conn));
+
+            // Restore the overlay window position saved on the previous run.
+            if let Some((x, y)) = commands::window::load_overlay_position(app.handle()) {
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    overlay.set_position(tauri::PhysicalPosition { x, y }).ok();
+                }
+            }
 
             shortcuts::register_all(app.handle());
             tray::create_tray(app.handle())?;
@@ -49,6 +57,8 @@ fn main() {
             commands::window::get_app_version,
             commands::window::overlay_set_position,
             commands::window::overlay_drag_start,
+            // Phase 5 — Overlay translate flow
+            commands::overlay::overlay_translate,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
