@@ -69,10 +69,12 @@ fn register_overlay_toggle(app: &tauri::AppHandle) {
 
 fn register_translate(app: &tauri::AppHandle) {
     let app_handle = app.clone();
+    // Ctrl+Alt+T conflicts with AltGr+T on non-US keyboards (produces © on some
+    // Brazilian/European layouts). Adding Shift breaks the AltGr composition.
     let shortcut = if cfg!(target_os = "macos") {
-        "Command+Alt+T"
+        "Command+Alt+Shift+T"
     } else {
-        "Control+Alt+T"
+        "Control+Alt+Shift+T"
     };
 
     app.global_shortcut()
@@ -86,7 +88,7 @@ fn register_translate(app: &tauri::AppHandle) {
             // the native clipboard/enigo work.
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = do_translate(app).await {
-                    eprintln!("[shortcut Ctrl+Alt+T] translate error: {}", e);
+                    eprintln!("[shortcut Ctrl+Alt+Shift+T] translate error: {}", e);
                 }
             });
         })

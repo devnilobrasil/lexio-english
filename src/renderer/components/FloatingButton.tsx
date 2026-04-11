@@ -50,7 +50,7 @@ export default function FloatingButton() {
     <button
       className={`floating-btn floating-btn--${state}`}
       onMouseDown={handleMouseDown}
-      title={errorMsg || 'Traduzir seleção (duplo clique ou Ctrl+Alt+T)'}
+      title={errorMsg || 'Traduzir seleção (duplo clique ou Ctrl+Alt+Shift+T)'}
     >
       <img src={lexioIcon} className="btn-icon-img" alt="Lexio" />
     </button>
