@@ -75,6 +75,13 @@ pub fn overlay_drag_start() {
     // no-op — drag state is managed in the renderer
 }
 
+/// Restarts the application to apply a downloaded update. Called by the
+/// renderer after `update:downloaded` is received.
+#[tauri::command]
+pub fn install_update(app: AppHandle) {
+    app.restart();
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

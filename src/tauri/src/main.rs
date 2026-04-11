@@ -8,6 +8,7 @@ mod state;
 mod text_bridge;
 mod tray;
 mod types;
+mod updater;
 
 use rusqlite::Connection;
 use state::AppState;
@@ -16,6 +17,7 @@ use tauri::Manager;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let db_path = db::get_db_path(app.handle());
             if let Some(parent) = db_path.parent() {
@@ -34,6 +36,12 @@ fn main() {
 
             shortcuts::register_all(app.handle());
             tray::create_tray(app.handle())?;
+
+            // Check for updates in background — no-op in dev mode (not packaged)
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                updater::check_and_setup(app_handle).await;
+            });
 
             Ok(())
         })
@@ -59,6 +67,8 @@ fn main() {
             commands::window::overlay_drag_start,
             // Phase 5 — Overlay translate flow
             commands::overlay::overlay_translate,
+            // Phase 6 — Auto-updater
+            commands::window::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

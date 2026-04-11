@@ -496,6 +496,110 @@ O endpoint OpenAI-compatible do Gemini (`v1beta/openai/...`) retornava 404 com "
 
 ---
 
-## Próximas Fases
+---
 
-- **Fase 6** — Auto-updater (tauri-plugin-updater), build/release pipeline, cleanup do `_electron_backup/` e `src/main/` antigos
+## Fase 6 — Auto-updater, Testes Vitest e Limpeza
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete (pending manual: `npm install`, `cargo test`, `npm run test`, `npm run build:renderer`)
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `Cargo.toml` | Adicionou `tauri-plugin-updater = "2"` | ✅ |
+| `updater.rs` | Criou — `check_and_setup`: verifica update em background, emite `update:available`, `update:progress`, `update:downloaded` | ✅ |
+| `commands/window.rs` | Adicionou `install_update` — chama `app.restart()` | ✅ |
+| `main.rs` | Registrou `tauri_plugin_updater::Builder::new().build()`, declarou `mod updater`, spawn async de `check_and_setup` no `.setup()`, registrou `install_update` no invoke_handler | ✅ |
+| `tauri.conf.json` | Adicionou `plugins.updater` (pubkey placeholder + endpoint GitHub releases), bundle targets `["msi","nsis"]`, `windows.digestAlgorithm`, `windows.timestampUrl` | ✅ |
+| `vitest.config.ts` | Alterou environment de `node` para `jsdom`, adicionou `setupFiles`, adicionou `globals: true` | ✅ |
+| `src/renderer/test/setup.ts` | Criou — `mockIPC` padrão + `clearMocks` por teste | ✅ |
+| `package.json` | Adicionou `@testing-library/react`, `@testing-library/user-event`, `jsdom` como devDeps | ✅ |
+| `useSearch.test.ts` | Criou — 6 testes com `mockIPC`: cache hit, loading state, error state, blank query, lowercase, toggleSaved | ✅ |
+
+### Arquivos criados
+
+- `src/tauri/src/updater.rs`
+- `src/renderer/test/setup.ts`
+- `src/renderer/hooks/useSearch.test.ts`
+
+### Arquivos modificados
+
+- `src/tauri/Cargo.toml` — adicionou `tauri-plugin-updater`
+- `src/tauri/src/main.rs` — plugin, mod updater, spawn updater, install_update command
+- `src/tauri/src/commands/window.rs` — adicionou `install_update`
+- `src/tauri/tauri.conf.json` — updater plugin config + bundle targets msi/nsis
+- `vitest.config.ts` — jsdom + setupFiles
+- `package.json` — devDeps de teste
+
+### Limpeza pendente (requer confirmação do usuário)
+
+Os seguintes diretórios são código morto do Electron, já excluídos do `tsconfig.json`, mas não deletados fisicamente (operação destrutiva anteriormente negada):
+
+```
+_electron_backup/    → pode deletar
+src/main/            → pode deletar (todo o main Electron)
+src/preload/index.ts → pode deletar (contextBridge não usado)
+```
+
+### Ações manuais necessárias antes de fechar a fase
+
+```bash
+# 1. Instalar novas devDeps de teste
+npm install
+
+# 2. Gerar chave de signing para o auto-updater (uma única vez)
+npx tauri signer generate -w ~/.tauri/lexio.key
+# → copiar a public key para tauri.conf.json em plugins.updater.pubkey
+# → guardar TAURI_SIGNING_PRIVATE_KEY como secret no GitHub
+
+# 3. Verificar build
+cargo test -p lexio
+npm run test
+npm run build:renderer
+```
+
+### Testes unitários (1 novo — Rust, 6 novos — Vitest, 35 total Rust)
+
+| Teste | Arquivo |
+|---|---|
+| `test_updater_module_compiles` | `updater.rs` |
+| `returns word when get_word resolves immediately` | `useSearch.test.ts` |
+| `shows loading state during an in-flight search` | `useSearch.test.ts` |
+| `sets error state when get_word throws` | `useSearch.test.ts` |
+| `ignores blank/whitespace-only search terms` | `useSearch.test.ts` |
+| `lowercases the search term before invoking` | `useSearch.test.ts` |
+| `updates word after toggleSaved` | `useSearch.test.ts` |
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `cargo test` passa (incluindo test_updater_module_compiles) | ⏳ Pendente — requer `cargo test` manual |
+| `npm run test` — 6 testes useSearch passando | ⏳ Pendente — requer `npm install` depois `npm run test` |
+| `npm run build:renderer` sem erros TypeScript | ⏳ Pendente |
+| Updater não executa em `npm run dev` (app não é packaged) | ✅ Lógica: `if !app.is_packaged() { return; }` |
+| `install_update` registrado no invoke_handler | ✅ |
+| `useAutoUpdater.ts` já consumia os eventos corretos | ✅ (migrado na Fase 4) |
+
+### Decisões
+
+1. **`install_update` chama `app.restart()`** — Tauri v2 faz o restart + apply do update automaticamente quando o app é reiniciado com o bundle disponível. Não há uma API explícita de "install then restart" separada no plugin-updater v2; restart é suficiente.
+
+2. **Pubkey como placeholder** — A chave real precisa ser gerada com `tauri signer generate`. Não é possível gerar automaticamente — requer interação com o filesystem do usuário e armazenamento seguro.
+
+3. **`vitest.config.ts` mudou de `node` para `jsdom`** — Hooks React precisam de um ambiente DOM para `useState`/`useEffect`. `jsdom` provê isso. Testes Rust (`cargo test`) não são afetados.
+
+4. **`react-i18next` mockado em `useSearch.test.ts`** — `useSearch` chama `useLocale` que usa `react-i18next`. Mockar o módulo é mais simples que configurar o provider i18n no ambiente de teste.
+
+---
+
+## Critérios de Saída da Migração
+
+Fases 1–6 completas. Pendentes somente execução manual:
+
+- [ ] `cargo test` — 0 falhas (espera-se 35 testes)
+- [ ] `npm run test` — 6 testes Vitest passando
+- [ ] `npm run build:renderer` — zero erros TypeScript
+- [ ] Chave de signing gerada e pubkey atualizada em `tauri.conf.json`
+- [ ] PR aberto para `stage` com description das mudanças arquiteturais
