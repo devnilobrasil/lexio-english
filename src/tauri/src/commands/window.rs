@@ -1,4 +1,4 @@
-use tauri::{AppHandle, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 #[tauri::command]
 pub fn close_window(window: WebviewWindow) {
