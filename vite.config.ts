@@ -27,5 +27,10 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    host: 'localhost',
+  },
+  envPrefix: ['VITE_', 'TAURI_'],
+  define: {
+    '__TAURI__': JSON.stringify(true),
   },
 })

@@ -1,5 +1,7 @@
 // src/renderer/hooks/useAutoUpdater.ts
 import { useState, useEffect } from 'react'
+import { listen } from '../lib/tauri-bridge'
+import { invoke } from '../lib/tauri-bridge'
 
 type UpdateState =
   | { status: 'idle' }
@@ -11,20 +13,24 @@ export function useAutoUpdater() {
   const [update, setUpdate] = useState<UpdateState>({ status: 'idle' })
 
   useEffect(() => {
-    window.lexio.onUpdateAvailable((version) => {
-      setUpdate({ status: 'available', version })
-    })
+    const unlisteners = Promise.all([
+      listen<string>('update:available', (e) => {
+        setUpdate({ status: 'available', version: e.payload })
+      }),
+      listen<number>('update:progress', (e) => {
+        setUpdate({ status: 'progress', pct: e.payload })
+      }),
+      listen<string>('update:downloaded', (e) => {
+        setUpdate({ status: 'downloaded', version: e.payload })
+      }),
+    ])
 
-    window.lexio.onUpdateProgress((pct) => {
-      setUpdate({ status: 'progress', pct })
-    })
-
-    window.lexio.onUpdateDownloaded((version) => {
-      setUpdate({ status: 'downloaded', version })
-    })
+    return () => {
+      unlisteners.then((fns) => fns.forEach((fn) => fn()))
+    }
   }, [])
 
-  const install = () => window.lexio.installUpdate()
+  const install = () => invoke<void>('install_update')
 
   return { update, install }
 }
