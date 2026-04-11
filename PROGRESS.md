@@ -295,6 +295,67 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 
 ---
 
+## Fase 4.1 — Overlay Fix: Image Render + Drag-and-Drop
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete
+
+### O que foi feito
+
+| Passo | Descrição | Status |
+|---|---|---|
+| `commands/window.rs` | Adicionou `overlay_set_position(x, y, app)` e `overlay_drag_start()` + 1 teste | ✅ |
+| `main.rs` | Registrou os 2 novos commands no invoke_handler | ✅ |
+| `useOverlay.ts` | Criou hook que substitui `window.lexioOverlay.*` com `invoke`/`listen` do Tauri | ✅ |
+| `FloatingButton.tsx` | Migrado de `window.lexioOverlay.*` para `useOverlay` hook | ✅ |
+| `overlay.css` | Adicionou `box-shadow: none; outline: none` ao `.floating-btn` para remover estilos default do browser | ✅ |
+| `tauri.conf.json` | Adicionou `"shadow": false` na janela overlay para remover sombra de janela do Windows | ✅ |
+| `commands/window.rs` | Importou `tauri::Manager` (necessário para `get_webview_window`) | ✅ |
+
+### Causa Raiz
+
+`FloatingButton.tsx` dependia de `window.lexioOverlay.*` — API exposta via `contextBridge` do Electron em `overlay-preload.ts`. No Tauri não existe preload/contextBridge, portanto `window.lexioOverlay` era `undefined` em runtime. O `useEffect` de registro de eventos crashava silenciosamente no mount, impedindo a renderização do componente.
+
+### Arquivos criados
+
+- `src/renderer/hooks/useOverlay.ts` — substitui `window.lexioOverlay.*` com Tauri IPC
+
+### Arquivos modificados
+
+- `src/tauri/src/commands/window.rs` — `overlay_set_position`, `overlay_drag_start`, `use tauri::Manager`
+- `src/tauri/src/main.rs` — registrou 2 novos commands
+- `src/renderer/components/FloatingButton.tsx` — usa `useOverlay` hook
+- `src/renderer/styles/overlay.css` — `box-shadow: none; outline: none` no botão
+- `src/tauri/tauri.conf.json` — `"shadow": false` na janela overlay
+
+### Testes unitários (1 novo, 26 total)
+
+| Teste | Arquivo |
+|---|---|
+| `test_overlay_drag_start_is_noop` | `commands/window.rs` |
+
+### Critérios de verificação
+
+| Critério | Resultado |
+|---|---|
+| `cargo test` passa (incluindo `test_overlay_drag_start_is_noop`) | ✅ 26/26 testes |
+| `npm run build:renderer` passa sem erros | ✅ Zero erros |
+| Overlay renderiza ícone Lexio | ✅ Confirmado pelo usuário |
+| Sem shadow/box extra ao redor do overlay | ✅ Corrigido via CSS + `shadow: false` |
+| Sem `window.lexioOverlay` no renderer | ✅ Confirmado via grep |
+
+### Decisões
+
+1. **`translate()` como stub** — Double-click tenta `invoke('overlay_translate')` que falha silenciosamente (command não existe ainda). Aceitável — botão renderiza e drag funciona. Implementação real na Fase 5.
+
+2. **`overlay_drag_start` é no-op** — No Electron também era vazio. Mantido por paridade de API.
+
+3. **`use tauri::Manager` obrigatório** — `get_webview_window` pertence ao trait `Manager`. Sem o import, o Rust encontra o método mas não o resolve, gerando `E0599`. Lição: sempre importar o trait explicitamente em Tauri v2.
+
+4. **Sombra dupla removida** — O box extra vinha de dois lugares independentes: estilos default do `<button>` no browser (removido com `box-shadow: none; outline: none` no CSS) e sombra de janela do Windows aplicada pelo OS (removida com `"shadow": false` no `tauri.conf.json`).
+
+---
+
 ## Próximas Fases
 
-- **Fase 5** — Auto-updater, build/release pipeline, cleanup do backup Electron
+- **Fase 5** — Overlay translate: clipboard capture + keyboard injection (`Ctrl+Alt+T`), auto-updater, build/release pipeline, cleanup do backup Electron
