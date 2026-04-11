@@ -27,6 +27,8 @@ html, body, #overlay-root {
   justify-content: center;
   background: transparent;
   padding: 0;
+  box-shadow: none;
+  outline: none;
   transition: opacity 0.2s ease, border-color 0.2s ease;
   -webkit-app-region: no-drag;
 }

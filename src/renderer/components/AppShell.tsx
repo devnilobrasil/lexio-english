@@ -5,6 +5,7 @@ import { ResultPanel } from './ResultPanel'
 import { UpdateBanner } from './UpdateBanner'
 import type { SidebarView } from './Sidebar'
 import { useSearch } from '../hooks/useSearch'
+import { useWindowControls } from '../hooks/useWindowControls'
 import { useWords } from '../hooks/useWords'
 import { useLocale } from '../hooks/useLocale'
 
@@ -16,12 +17,13 @@ export function AppShell() {
   const { word, loading, error, search, toggleSaved, query } = useSearch()
   const { savedWords, history, fetchSaved, fetchHistory, removeFromHistory, unsaveWord } = useWords()
   const { locale } = useLocale()
+  const { resize } = useWindowControls()
   const prevLocaleRef = useRef(locale)
 
   const transitionTo = useCallback((state: WindowState) => {
     setWindowState(state)
-    window.lexio.resizeWindow(state)
-  }, [])
+    resize(state)
+  }, [resize])
 
   // When search returns a result, switch to definition view
   useEffect(() => {

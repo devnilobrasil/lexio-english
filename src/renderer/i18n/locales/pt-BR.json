@@ -51,9 +51,9 @@
   },
   "settings": {
     "title": "Configurações",
-    "apiKey": "Chave API (Groq)",
+    "apiKey": "Chave API (Gemini)",
     "apiKeyPlaceholder": "Cole sua chave da API aqui...",
-    "apiKeyHelper": "Obtenha sua chave em console.groq.com",
+    "apiKeyHelper": "Obtenha sua chave em aistudio.google.com/apikey",
     "save": "Salvar",
     "saved": "Salvo ✓",
     "about": "Sobre",

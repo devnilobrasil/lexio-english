@@ -1,6 +1,7 @@
 // src/renderer/hooks/useWords.ts
 import { useState, useCallback } from 'react'
 import type { Word } from '../../types'
+import { invoke } from '../lib/tauri-bridge'
 import { useLocale } from './useLocale'
 
 export function useWords() {
@@ -12,7 +13,7 @@ export function useWords() {
   const fetchSaved = useCallback(async () => {
     setLoading(true)
     try {
-      const words = await window.lexio.getSaved(locale)
+      const words = await invoke<Word[]>('get_saved', { locale })
       setSavedWords(words)
     } catch (err) {
       console.error('Failed to fetch saved words:', err)
@@ -24,7 +25,7 @@ export function useWords() {
   const fetchHistory = useCallback(async (limit = 50) => {
     setLoading(true)
     try {
-      const words = await window.lexio.getHistory(locale, limit)
+      const words = await invoke<Word[]>('get_history', { locale, limit })
       setHistory(words)
     } catch (err) {
       console.error('Failed to fetch history:', err)
@@ -35,7 +36,7 @@ export function useWords() {
 
   const deleteWord = async (word: string) => {
     try {
-      await window.lexio.deleteWord(word)
+      await invoke<void>('delete_word', { word })
       fetchSaved()
       fetchHistory()
     } catch (err) {
@@ -45,7 +46,7 @@ export function useWords() {
 
   const removeFromHistory = async (word: string) => {
     try {
-      await window.lexio.removeFromHistory(word)
+      await invoke<void>('remove_from_history', { word })
       fetchHistory()
     } catch (err) {
       console.error('Failed to remove word from history:', err)
@@ -54,7 +55,7 @@ export function useWords() {
 
   const unsaveWord = async (word: string) => {
     try {
-      await window.lexio.unsaveWord(word)
+      await invoke<void>('unsave_word', { word })
       fetchSaved()
     } catch (err) {
       console.error('Failed to unsave word:', err)
