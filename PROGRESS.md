@@ -372,7 +372,7 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 | `commands/overlay.rs` | Criou — `do_translate` (lógica async compartilhada) + command `overlay_translate` | ✅ |
 | `commands/mod.rs` | Adicionou `pub mod overlay` | ✅ |
 | `commands/window.rs` | Persistência: `persist_overlay_position` + `load_overlay_position` em `<app_data_dir>/overlay-position.json`; `overlay_set_position` agora persiste | ✅ |
-| `shortcuts.rs` | Registrou `Ctrl+Alt+T` → spawna `do_translate` no runtime tokio | ✅ |
+| `shortcuts.rs` | Registrou `Ctrl+Alt+Shift+T` → spawna `do_translate` no runtime tokio | ✅ |
 | `main.rs` | Declarou `mod text_bridge`, registrou `overlay_translate` no invoke_handler, carrega posição persistida no setup | ✅ |
 | `preload/overlay-preload.ts` | Deletado — não é mais usado (useOverlay.ts já migrado na Fase 4.1) | ✅ |
 
@@ -388,7 +388,7 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 - `src/tauri/src/ai_client/mod.rs` — `pub mod translate_prompt` + `fetch_translation`
 - `src/tauri/src/commands/mod.rs` — `pub mod overlay`
 - `src/tauri/src/commands/window.rs` — persistência de posição do overlay
-- `src/tauri/src/shortcuts.rs` — registrou Ctrl+Alt+T
+- `src/tauri/src/shortcuts.rs` — registrou Ctrl+Alt+Shift+T
 - `src/tauri/src/main.rs` — módulo `text_bridge`, carrega posição salva, registra `overlay_translate`
 
 ### Arquivos deletados
@@ -398,7 +398,7 @@ Tracking document for the Electron → Tauri v2 migration. Updated at the end of
 ### Fluxo do `do_translate`
 
 ```
-Ctrl+Alt+T → spawn async task →
+Ctrl+Alt+Shift+T → spawn async task →
   1. emit "loading"
   2. spawn_blocking(capture_selection) → Ctrl+C + arboard + 80ms
      • None → emit "idle", return (silencioso)
@@ -431,25 +431,25 @@ Testes reais de clipboard/enigo são OS-dependentes (requerem display) — verif
 
 | Critério | Resultado |
 |---|---|
-| `cargo test` passa | ⏳ Aguardando execução manual |
+| `cargo test` passa | ✅ 34/34 testes confirmados pelo usuário |
 | `npm run build:renderer` passa sem erros | ✅ Zero erros |
-| `Ctrl+Alt+T` captura seleção e injeta tradução | ⏳ Teste manual |
-| Sem seleção → overlay volta para idle silenciosamente | ⏳ Teste manual |
-| Sem API key → overlay mostra error com mensagem | ⏳ Teste manual |
-| Clipboard do usuário restaurado após capture + inject | ⏳ Teste manual |
-| Overlay salva posição ao arrastar | ⏳ Teste manual |
-| Posição do overlay persiste entre reinicializações | ⏳ Teste manual |
+| `Ctrl+Alt+Shift+T` captura seleção e injeta tradução | ⏳ Teste manual pendente |
+| Sem seleção → overlay volta para idle silenciosamente | ⏳ Teste manual pendente |
+| Sem API key → overlay mostra error com mensagem | ⏳ Teste manual pendente |
+| Clipboard do usuário restaurado após capture + inject | ⏳ Teste manual pendente |
+| Overlay salva posição ao arrastar | ⏳ Teste manual pendente |
+| Posição do overlay persiste entre reinicializações | ⏳ Teste manual pendente |
 | `src/preload/overlay-preload.ts` deletado | ✅ Confirmado |
-| `Ctrl+Alt+E` e `Ctrl+Alt+O` ainda funcionam (regressão) | ⏳ Teste manual |
+| `Ctrl+Alt+E` e `Ctrl+Alt+O` ainda funcionam (regressão) | ⏳ Teste manual pendente |
 
 ### Checklist manual pós-build
 
-- [ ] Selecionar texto em Notepad, pressionar Ctrl+Alt+T → tradução injetada
-- [ ] Selecionar texto em browser, pressionar Ctrl+Alt+T → tradução injetada
+- [ ] Selecionar texto em Notepad, pressionar Ctrl+Alt+Shift+T → tradução injetada
+- [ ] Selecionar texto em browser, pressionar Ctrl+Alt+Shift+T → tradução injetada
 - [ ] Double-click no overlay com seleção ativa → tradução injetada
 - [ ] Arrastar overlay, fechar app, reabrir → overlay aparece na posição salva
-- [ ] Sem API key configurada, Ctrl+Alt+T → overlay fica vermelho (error)
-- [ ] Sem seleção, Ctrl+Alt+T → overlay volta para idle sem alarde
+- [ ] Sem API key configurada, Ctrl+Alt+Shift+T → overlay fica vermelho (error)
+- [ ] Sem seleção, Ctrl+Alt+Shift+T → overlay volta para idle sem alarde
 
 ### Decisões
 
@@ -464,6 +464,35 @@ Testes reais de clipboard/enigo são OS-dependentes (requerem display) — verif
 5. **`app_data_dir` como storage** — Mesma pasta do SQLite (`lexio.db`). O Tauri resolve isso via `app.path().app_data_dir()` → `%APPDATA%\Lexio\` no Windows.
 
 6. **TRADEOFF vs selection-hook (Electron)** — Documentado em `text_bridge.rs`: o selection-hook do Electron usava UIAutomation passivamente (sem keypress). Aqui simulamos Ctrl+C, o que pode ter side-effects em apps que interceptam esse atalho. Tradeoff aceito em troca de cross-platform real via `enigo`/`arboard`.
+
+---
+
+## Fase 5.1 — Fixes Pós-Fase 5
+
+**Branch:** `feat/migrate-to-tauri`
+**Status:** Complete
+
+### O que foi feito
+
+| Fix | Descrição | Commit |
+|---|---|---|
+| Atalho tradução | `Ctrl+Alt+T` → `Ctrl+Alt+Shift+T` — conflito com AltGr+T em teclados BR (produzia `©`) | `faf86f4` |
+| Model ID | `gemini-2.0-flash` → `gemini-2.5-flash` — modelo anterior retornando 404 na API | `cc4e12d` |
+| Model ID intermediário | `gemini-2.5-flash-preview-04-17` também retornou 404 (preview expirado) | — |
+
+### Causa Raiz dos Fixes
+
+**Atalho (`Ctrl+Alt+T` → `Ctrl+Alt+Shift+T`):**  
+No Windows, `Ctrl+Alt` é equivalente a `AltGr`. Em teclados ABNT2/brasileiros, `AltGr+T` produz `©` — o OS resolve o caractere *antes* do hook de shortcut global interceptar. Adicionar `Shift` quebra a composição de caractere. `Ctrl+Alt+E` e `Ctrl+Alt+O` não tinham o problema porque essas posições não geram caracteres no layout ABNT2.
+
+**Model ID:**  
+O endpoint OpenAI-compatible do Gemini (`v1beta/openai/...`) retornava 404 com "API version v1main" para `gemini-2.0-flash` e para o preview datado `gemini-2.5-flash-preview-04-17`. O alias estável `gemini-2.5-flash` é o ID correto para o modelo atual.
+
+### Arquivos modificados
+
+- `src/tauri/src/shortcuts.rs` — shortcut de tradução: `Control+Alt+T` → `Control+Alt+Shift+T`
+- `src/renderer/components/FloatingButton.tsx` — tooltip atualizado para novo atalho
+- `src/tauri/src/ai_client/config.rs` — `AI_MODEL = "gemini-2.5-flash"`
 
 ---
 
