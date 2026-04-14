@@ -161,7 +161,7 @@ describe('useInlineSuggestion', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('overlay:suggestion-state=idle redimensiona janela para 48×48', async () => {
+  it('overlay:suggestion-state=idle redimensiona janela para 32×32', async () => {
     vi.mocked(invoke).mockResolvedValue(undefined)
 
     const { result } = renderHook(() => useInlineSuggestion())
@@ -171,7 +171,7 @@ describe('useInlineSuggestion', () => {
       fireEvent('overlay:suggestion-state', 'idle')
     })
 
-    expect(invoke).toHaveBeenCalledWith('overlay_set_size', { width: 48, height: 48 })
+    expect(invoke).toHaveBeenCalledWith('overlay_set_size', { width: 32, height: 32 })
     expect(result.current.state).toBe('idle')
   })
 

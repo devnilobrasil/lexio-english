@@ -3,8 +3,8 @@
 // Pure functions for calculating overlay window placement.
 // All functions are side-effect-free and easily unit-testable.
 
-export const BTN_SIZE = 48
-export const DIALOG_WIDTH = 360   // 48 btn + 8 gap + 304 dialog
+export const BTN_SIZE = 32
+export const DIALOG_WIDTH = 360   // 32 btn + 8 gap + 320 dialog
 export const DIALOG_HEIGHT = 120  // row layout — more compact than column
 
 const MARGIN = 8

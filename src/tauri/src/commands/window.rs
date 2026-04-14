@@ -127,7 +127,7 @@ mod tests {
         // Validates that the sizes the frontend sends are sane values
         let dialog_width: u32 = 360;
         let dialog_height: u32 = 120;
-        let btn_size: u32 = 48;
+        let btn_size: u32 = 32;
         assert!(dialog_width > btn_size);
         assert!(dialog_height > btn_size);
         assert!(btn_size > 0);

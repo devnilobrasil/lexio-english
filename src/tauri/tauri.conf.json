@@ -30,8 +30,8 @@
       {
         "label": "overlay",
         "title": "Lexio Overlay",
-        "width": 48,
-        "height": 48,
+        "width": 32,
+        "height": 32,
         "x": 32,
         "y": 200,
         "resizable": false,
