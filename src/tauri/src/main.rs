@@ -3,6 +3,8 @@
 mod ai_client;
 mod commands;
 mod db;
+mod lang_detect;
+mod selection_watcher;
 mod shortcuts;
 mod state;
 mod text_bridge;
@@ -35,6 +37,7 @@ fn main() {
             }
 
             shortcuts::register_all(app.handle());
+            selection_watcher::start_watcher(app.handle().clone());
             tray::create_tray(app.handle())?;
 
             // Check for updates in background — no-op in dev mode (not packaged)
@@ -56,6 +59,10 @@ fn main() {
             commands::words::unsave_word,
             commands::words::get_api_key,
             commands::words::set_api_key,
+            commands::words::get_groq_api_key,
+            commands::words::set_groq_api_key,
+            commands::words::get_selected_provider,
+            commands::words::set_selected_provider,
             // Phase 3 — AI (async)
             commands::words::get_word,
             // Phase 4 — Window controls
@@ -64,9 +71,12 @@ fn main() {
             commands::window::resize_window,
             commands::window::get_app_version,
             commands::window::overlay_set_position,
+            commands::window::overlay_set_size,
             commands::window::overlay_drag_start,
-            // Phase 5 — Overlay translate flow
-            commands::overlay::overlay_translate,
+            // Phase 5 — Inline translation suggestion commands
+            commands::suggestion::suggestion_request,
+            commands::suggestion::suggestion_accept,
+            commands::suggestion::suggestion_dismiss,
             // Phase 6 — Auto-updater
             commands::window::install_update,
         ])

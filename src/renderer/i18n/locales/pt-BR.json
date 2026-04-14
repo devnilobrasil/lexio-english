@@ -51,7 +51,7 @@
   },
   "settings": {
     "title": "Configurações",
-    "apiKey": "Chave API (Gemini)",
+    "apiKey": "Chave API",
     "apiKeyPlaceholder": "Cole sua chave da API aqui...",
     "apiKeyHelper": "Obtenha sua chave em aistudio.google.com/apikey",
     "save": "Salvar",

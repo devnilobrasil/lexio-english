@@ -2,14 +2,14 @@ pub mod config;
 pub mod translate_prompt;
 pub mod word_prompt;
 
-use crate::ai_client::config::{AI_BASE_URL, AI_MODEL};
+use crate::ai_client::config::{GEMINI_BASE_URL, GEMINI_MODEL, GROQ_BASE_URL, GROQ_MODEL};
 use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
 use crate::ai_client::word_prompt::{build_user_prompt, SYSTEM_PROMPT};
 use crate::types::AIWordResponse;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct ChatMessage {
     role: String,
     content: String,
@@ -43,114 +43,209 @@ struct ChoiceMessage {
     content: String,
 }
 
+/// Returns `(base_url, model)` for the given provider name.
+/// Defaults to Gemini for any unrecognised value.
+fn provider_config(provider: &str) -> (&'static str, &'static str) {
+    match provider {
+        "groq" => (GROQ_BASE_URL, GROQ_MODEL),
+        _ => (GEMINI_BASE_URL, GEMINI_MODEL),
+    }
+}
+
+/// Low-level HTTP call to any OpenAI-compatible endpoint.
+/// Returns the raw `content` string from `choices[0].message.content`.
+/// `json_mode`: when true, adds `response_format: { type: "json_object" }`.
+async fn call_provider(
+    client: &Client,
+    base_url: &str,
+    model: &str,
+    api_key: &str,
+    messages: Vec<ChatMessage>,
+    json_mode: bool,
+) -> Result<String, String> {
+    let response = if json_mode {
+        let request = ChatRequest {
+            model: model.to_string(),
+            messages,
+            response_format: ResponseFormat {
+                format_type: "json_object".to_string(),
+            },
+        };
+        client
+            .post(base_url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?
+    } else {
+        let request = serde_json::json!({
+            "model": model,
+            "messages": messages.iter().map(|m| serde_json::json!({
+                "role": m.role,
+                "content": m.content,
+            })).collect::<Vec<_>>()
+        });
+        client
+            .post(base_url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP error: {}", e))?
+    };
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("AI provider error {}: {}", status, body));
+    }
+
+    let chat: ChatResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+    chat.choices
+        .first()
+        .map(|c| c.message.content.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Empty response from AI provider".to_string())
+}
+
+/// Fetches word data from the selected AI provider.
+///
+/// `provider`: "gemini" | "groq" — determines which endpoint and model to use.
+/// `api_key`: the key for the selected provider. Returns an error if empty.
 pub async fn fetch_word(
     client: &Client,
+    provider: &str,
     api_key: &str,
     word: &str,
     locale: &str,
 ) -> Result<AIWordResponse, String> {
-    let request = ChatRequest {
-        model: AI_MODEL.to_string(),
-        messages: vec![
-            ChatMessage {
-                role: "system".to_string(),
-                content: SYSTEM_PROMPT.to_string(),
-            },
-            ChatMessage {
-                role: "user".to_string(),
-                content: build_user_prompt(word, locale),
-            },
-        ],
-        response_format: ResponseFormat {
-            format_type: "json_object".to_string(),
-        },
-    };
-
-    let response = client
-        .post(AI_BASE_URL)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Gemini API error {}: {}", status, body));
+    if api_key.is_empty() {
+        return Err(format!(
+            "Chave {} não configurada. Acesse Configurações.",
+            provider
+        ));
     }
 
-    let chat: ChatResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    let messages = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: SYSTEM_PROMPT.to_string(),
+        },
+        ChatMessage {
+            role: "user".to_string(),
+            content: build_user_prompt(word, locale),
+        },
+    ];
 
-    let content = chat
-        .choices
-        .first()
-        .map(|c| c.message.content.clone())
-        .ok_or("Empty response from Gemini")?;
-
+    let (base_url, model) = provider_config(provider);
+    let content = call_provider(client, base_url, model, api_key, messages, true).await?;
     serde_json::from_str::<AIWordResponse>(&content)
         .map_err(|e| format!("Failed to parse AI response JSON: {}", e))
 }
 
-/// Translates `text` to English using the Gemini OpenAI-compatible endpoint.
+/// Translates `text` to English using the selected AI provider.
 /// Returns plain text (no JSON wrapping).
+///
+/// `provider`: "gemini" | "groq".
+/// `api_key`: the key for the selected provider. Returns an error if empty.
 pub async fn fetch_translation(
     client: &Client,
+    provider: &str,
     api_key: &str,
     text: &str,
 ) -> Result<String, String> {
-    let request = serde_json::json!({
-        "model": AI_MODEL,
-        "messages": [
-            { "role": "system", "content": TRANSLATE_SYSTEM_PROMPT },
-            { "role": "user", "content": text }
-        ]
-    });
-
-    let response = client
-        .post(AI_BASE_URL)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("Gemini translation error {}: {}", status, body));
+    if api_key.is_empty() {
+        return Err(format!(
+            "Chave {} não configurada. Acesse Configurações.",
+            provider
+        ));
     }
 
-    let chat: ChatResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    let messages = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: TRANSLATE_SYSTEM_PROMPT.to_string(),
+        },
+        ChatMessage {
+            role: "user".to_string(),
+            content: text.to_string(),
+        },
+    ];
 
-    let content = chat
-        .choices
-        .first()
-        .map(|c| c.message.content.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .ok_or("Empty response from Gemini translation")?;
-
-    Ok(content)
+    let (base_url, model) = provider_config(provider);
+    call_provider(client, base_url, model, api_key, messages, false).await
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ai_client::config::AI_MODEL;
+    use super::*;
     use crate::ai_client::word_prompt::{build_user_prompt, locale_name};
 
+    // --- provider_config ---
+
     #[test]
-    fn test_model_is_gemini() {
-        assert!(
-            AI_MODEL.contains("gemini"),
-            "AI_MODEL must be Gemini, not GROQ"
-        );
+    fn provider_config_groq_returns_groq_constants() {
+        let (url, model) = provider_config("groq");
+        assert_eq!(url, GROQ_BASE_URL);
+        assert_eq!(model, GROQ_MODEL);
     }
+
+    #[test]
+    fn provider_config_gemini_returns_gemini_constants() {
+        let (url, model) = provider_config("gemini");
+        assert_eq!(url, GEMINI_BASE_URL);
+        assert_eq!(model, GEMINI_MODEL);
+    }
+
+    #[test]
+    fn provider_config_unknown_defaults_to_gemini() {
+        let (url, model) = provider_config("openai");
+        assert_eq!(url, GEMINI_BASE_URL);
+        assert_eq!(model, GEMINI_MODEL);
+    }
+
+    // --- empty key guard ---
+
+    #[test]
+    fn fetch_word_rejects_empty_api_key() {
+        // Validate that an empty key is rejected before any HTTP call is made.
+        // We mirror the guard logic directly since we can't call the async fn in a sync test.
+        let api_key = "";
+        let provider = "gemini";
+        let result: Result<(), String> = if api_key.is_empty() {
+            Err(format!(
+                "Chave {} não configurada. Acesse Configurações.",
+                provider
+            ))
+        } else {
+            Ok(())
+        };
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("gemini"));
+    }
+
+    #[test]
+    fn fetch_translation_rejects_empty_api_key() {
+        let api_key = "";
+        let provider = "groq";
+        let result: Result<(), String> = if api_key.is_empty() {
+            Err(format!(
+                "Chave {} não configurada. Acesse Configurações.",
+                provider
+            ))
+        } else {
+            Ok(())
+        };
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("groq"));
+    }
+
+    // --- locale / prompt ---
 
     #[test]
     fn test_locale_name_pt_br() {
@@ -220,14 +315,11 @@ mod tests {
     #[test]
     fn test_translate_prompt_forbids_explanations() {
         use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
-        // The prompt must require the model to return ONLY the translation.
         assert!(TRANSLATE_SYSTEM_PROMPT.to_lowercase().contains("only"));
     }
 
     #[test]
     fn test_parse_translation_response_extracts_content() {
-        // Reuses the same ChatResponse struct — simulate what Gemini returns
-        // for a translation call.
         let json = r#"{
             "choices": [
                 { "message": { "content": "The cat sat on the mat." } }

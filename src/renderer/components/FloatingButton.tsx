@@ -1,39 +1,66 @@
 import { useRef } from 'react'
 import lexioIcon from '../../assets/lexio-icon-512.png'
-import { useOverlay } from '../hooks/useOverlay'
+import { invoke } from '../lib/tauri-bridge'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { SuggestionDialog } from './SuggestionDialog'
+import type { InlineSuggestionState } from '../../types'
 import '../styles/overlay.css'
 
-export default function FloatingButton() {
-  const { state, errorMsg, translate, dragStart, setPosition } = useOverlay()
-  const dragRef = useRef<{ startX: number; startY: number; winX: number; winY: number } | null>(null)
-  const lastClickRef = useRef<number>(0)
-  const DOUBLE_CLICK_MS = 350
+interface FloatingButtonProps {
+  suggestionState: InlineSuggestionState
+  suggestionOriginal: string
+  suggestionTranslation: string | null
+  suggestionError: string | null
+  onBubbleClick: () => void
+  onSuggestionAccept: () => void
+  onSuggestionReject: () => void
+}
 
-  function handleMouseDown(e: React.MouseEvent) {
+export default function FloatingButton({
+  suggestionState,
+  suggestionOriginal,
+  suggestionTranslation,
+  suggestionError,
+  onBubbleClick,
+  onSuggestionAccept,
+  onSuggestionReject,
+}: FloatingButtonProps) {
+  const dragRef = useRef<{ startX: number; startY: number; winX: number; winY: number } | null>(null)
+
+  const isDialogOpen =
+    suggestionState === 'loading' ||
+    suggestionState === 'ready' ||
+    suggestionState === 'error'
+
+  async function handleMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return
 
-    // Manual double-click detection (required for focusable:false windows)
-    const now = Date.now()
-    if (now - lastClickRef.current < DOUBLE_CLICK_MS) {
-      lastClickRef.current = 0
-      if (state === 'idle') translate()
-      return
-    }
-    lastClickRef.current = now
+    const startX = e.screenX
+    const startY = e.screenY
 
-    dragStart()
+    invoke<void>('overlay_drag_start')
+
+    // Use outerPosition() for the true physical window position.
+    // window.screenX/Y is unreliable inside a Tauri WebView.
+    const pos = await getCurrentWindow().outerPosition()
     dragRef.current = {
-      startX: e.screenX,
-      startY: e.screenY,
-      winX: window.screenX,
-      winY: window.screenY,
+      startX,
+      startY,
+      winX: pos.x,
+      winY: pos.y,
     }
+
+    const dpr = window.devicePixelRatio || 1
 
     function onMouseMove(ev: MouseEvent) {
       if (!dragRef.current) return
       const dx = ev.screenX - dragRef.current.startX
       const dy = ev.screenY - dragRef.current.startY
-      setPosition(dragRef.current.winX + dx, dragRef.current.winY + dy)
+      // screenX/Y delta is in logical pixels; overlay_set_position expects physical.
+      invoke<void>('overlay_set_position', {
+        x: Math.round(dragRef.current.winX + dx * dpr),
+        y: Math.round(dragRef.current.winY + dy * dpr),
+      })
     }
 
     function onMouseUp() {
@@ -46,13 +73,37 @@ export default function FloatingButton() {
     window.addEventListener('mouseup', onMouseUp)
   }
 
+  // Map InlineSuggestionState to a CSS modifier for the button.
+  // 'ready' has no dedicated style — button is secondary when dialog is visible.
+  const btnStyle: Record<InlineSuggestionState, string> = {
+    idle: 'idle',
+    available: 'available',
+    loading: 'loading',
+    ready: 'idle',
+    error: 'error',
+  }
+
   return (
-    <button
-      className={`floating-btn floating-btn--${state}`}
-      onMouseDown={handleMouseDown}
-      title={errorMsg || 'Traduzir seleção (duplo clique ou Ctrl+Alt+Shift+T)'}
-    >
-      <img src={lexioIcon} className="btn-icon-img" alt="Lexio" />
-    </button>
+    <div className={isDialogOpen ? 'overlay--expanded' : ''}>
+      <button
+        className={['floating-btn', `floating-btn--${btnStyle[suggestionState]}`].join(' ')}
+        onMouseDown={suggestionState === 'idle' ? handleMouseDown : undefined}
+        onClick={suggestionState === 'available' ? onBubbleClick : undefined}
+        title="Traduzir seleção"
+      >
+        <img src={lexioIcon} className="btn-icon-img" alt="Lexio" />
+      </button>
+
+      {isDialogOpen && (
+        <SuggestionDialog
+          state={suggestionState as 'loading' | 'ready' | 'error'}
+          original={suggestionOriginal}
+          translation={suggestionTranslation}
+          errorMessage={suggestionError}
+          onAccept={onSuggestionAccept}
+          onReject={onSuggestionReject}
+        />
+      )}
+    </div>
   )
 }

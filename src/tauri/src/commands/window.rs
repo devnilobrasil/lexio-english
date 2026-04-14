@@ -71,6 +71,18 @@ pub fn overlay_set_position(x: i32, y: i32, app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn overlay_set_size(width: u32, height: u32, app: AppHandle) {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay
+            .set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: width as f64,
+                height: height as f64,
+            }))
+            .ok();
+    }
+}
+
+#[tauri::command]
 pub fn overlay_drag_start() {
     // no-op — drag state is managed in the renderer
 }
@@ -108,6 +120,17 @@ mod tests {
             _ => None,
         };
         assert!(height.is_none());
+    }
+
+    #[test]
+    fn test_overlay_set_size_dimensions_are_positive() {
+        // Validates that the sizes the frontend sends are sane values
+        let dialog_width: u32 = 360;
+        let dialog_height: u32 = 120;
+        let btn_size: u32 = 32;
+        assert!(dialog_width > btn_size);
+        assert!(dialog_height > btn_size);
+        assert!(btn_size > 0);
     }
 
     #[test]

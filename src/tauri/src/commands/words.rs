@@ -20,15 +20,26 @@ pub async fn get_word(
         return Ok(cached);
     }
 
-    // 2. Cache miss — get API key
+    // 2. Cache miss — read selected provider and its API key
+    let provider = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db_settings::get_selected_provider(&conn)
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| "gemini".to_string())
+    };
+
     let api_key = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
-        db_settings::get_api_key(&conn).map_err(|e| e.to_string())?
+        let key = match provider.as_str() {
+            "groq" => db_settings::get_groq_api_key(&conn),
+            _ => db_settings::get_api_key(&conn),
+        };
+        key.map_err(|e| e.to_string())?.unwrap_or_default()
     };
-    let api_key = api_key.ok_or("API key not configured. Please set it in Settings.")?;
 
-    // 3. Call Gemini
-    let ai_response = ai_client::fetch_word(&state.http, &api_key, &word, &locale).await?;
+    // 3. Call AI with the selected provider
+    let ai_response =
+        ai_client::fetch_word(&state.http, &provider, &api_key, &word, &locale).await?;
 
     // 4. Auto-save to SQLite
     let saved = {
@@ -99,4 +110,28 @@ pub fn get_api_key(state: State<'_, AppState>) -> Result<Option<String>, String>
 pub fn set_api_key(key: String, state: State<'_, AppState>) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     db_settings::set_api_key(&conn, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_groq_api_key(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db_settings::get_groq_api_key(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_groq_api_key(key: String, state: State<'_, AppState>) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db_settings::set_groq_api_key(&conn, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_selected_provider(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db_settings::get_selected_provider(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_selected_provider(provider: String, state: State<'_, AppState>) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db_settings::set_selected_provider(&conn, &provider).map_err(|e| e.to_string())
 }

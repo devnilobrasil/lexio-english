@@ -44,7 +44,7 @@ node_modules/
 
 # git worktrees
 .worktrees/
-tauri-migration
+# tauri-migration
 
 #mcp
 .mcp.json
