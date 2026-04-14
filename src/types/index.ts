@@ -81,6 +81,24 @@ export interface LexioAPI {
 
 export type OverlayState = 'idle' | 'loading' | 'success' | 'error'
 
+export type InlineSuggestionState =
+  | 'idle'
+  | 'available'
+  | 'loading'
+  | 'ready'
+  | 'error'
+
+export interface TextSelectedPayload {
+  text: string
+  x: number
+  y: number
+}
+
+export interface SuggestionResponse {
+  original: string
+  translation: string
+}
+
 export interface TextSelection {
   text: string
   programName: string

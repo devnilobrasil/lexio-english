@@ -3,7 +3,9 @@
   "compilerOptions": {
     "module": "ESNext",
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "noEmit": true
   },
-  "include": ["src/renderer/**/*", "src/types/**/*"]
+  "include": ["src/renderer/**/*", "src/types/**/*"],
+  "exclude": ["src/renderer/**/*.test.ts", "src/renderer/**/*.test.tsx", "src/renderer/test/**/*"]
 }

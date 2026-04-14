@@ -9,5 +9,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "paths": { "@/*": ["./src/*"] }
-  }
+  },
+  "exclude": ["src/main", "src/preload", "_electron_backup", "node_modules"]
 }

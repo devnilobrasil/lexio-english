@@ -1,0 +1,10 @@
+Este arquivo foi movido para:
+.claude/tauri-migration/SPEC.md
+
+Os planos de implementação por fase estão em:
+.claude/tauri-migration/fase-1-scaffolding.md
+.claude/tauri-migration/fase-2-db-settings.md
+.claude/tauri-migration/fase-3-groq-api.md
+.claude/tauri-migration/fase-4-windows-shortcuts-tray.md
+.claude/tauri-migration/fase-5-overlay-translation.md
+.claude/tauri-migration/fase-6-updater-tests.md
