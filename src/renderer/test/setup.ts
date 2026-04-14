@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom'
 import { mockIPC, clearMocks } from '@tauri-apps/api/mocks'
 
 beforeEach(() => {

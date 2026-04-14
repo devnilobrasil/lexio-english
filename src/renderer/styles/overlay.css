@@ -5,75 +5,83 @@
   padding: 0;
 }
 
-html, body, #overlay-root {
-  width: 48px;
-  height: 48px;
-  overflow: hidden;
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   background: transparent;
   -webkit-user-select: none;
   user-select: none;
 }
 
-/* Botão flutuante */
+#overlay-root {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  background: transparent;
+}
+
+/* ── Floating button ─────────────────────────────────────────────────────────── */
+
 .floating-btn {
   position: relative;
   width: 48px;
   height: 48px;
-  border-radius: 50px;
-  border: 2px solid #F0EEE9;
+  border-radius: 50%;
+  border: 2px solid #E2E0DA;
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: #FFFFFF;
   padding: 0;
-  box-shadow: none;
   outline: none;
-  transition: opacity 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+  transition: border-color 0.15s ease, opacity 0.2s ease;
   -webkit-app-region: no-drag;
+  flex-shrink: 0;
 }
 
 .floating-btn:active {
   cursor: grabbing;
 }
 
-/* Ícone real do app */
 .btn-icon-img {
-  width: 44px;
-  height: 44px;
-  border-radius: 30px;
+  width: 48px;
+  height: 48px;
   display: block;
   pointer-events: none;
   object-fit: cover;
 }
 
-/* Estado idle — semi-transparente */
+/* idle — semi-transparent */
 .floating-btn--idle {
-  opacity: 0.7;
+  opacity: 0.65;
+  border-color: #E2E0DA;
 }
 
 .floating-btn--idle:hover {
   opacity: 1;
 }
 
-/* Estado loading — pulso no ícone */
+/* available — green border: translation is ready to be triggered */
+.floating-btn--available {
+  opacity: 1;
+  border-color: #3a6b42;
+  cursor: pointer;
+}
+
+/* loading — pulse animation */
 .floating-btn--loading {
   opacity: 1;
+  border-color: #E2E0DA;
 }
 
 .floating-btn--loading .btn-icon-img {
   animation: pulse 0.9s ease-in-out infinite;
 }
 
-/* Estado success — borda verde */
-.floating-btn--success {
-  opacity: 1;
-  border-color: #3a6b42;
-  animation: fade-out 2s ease forwards;
-  animation-delay: 0.5s;
-}
-
-/* Estado error — borda vermelha */
+/* error — red border */
 .floating-btn--error {
   opacity: 1;
   border-color: #8b3a3a;
@@ -84,7 +92,112 @@ html, body, #overlay-root {
   50%       { opacity: 0.5; transform: scale(0.88); }
 }
 
-@keyframes fade-out {
-  0%   { opacity: 1; }
-  100% { opacity: 0.65; }
+/* ── Overlay expanded (dialog open) ─────────────────────────────────────────── */
+
+.overlay--expanded {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* ── SuggestionDialog ────────────────────────────────────────────────────────── */
+
+.suggestion-dialog {
+  width: 304px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E0DA;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Loading */
+.suggestion-dialog__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+  min-height: 72px;
+}
+
+.suggestion-dialog__spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #E2E0DA;
+  border-top-color: #0C447C;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Body — translation text */
+.suggestion-dialog__body {
+  padding: 14px 14px 10px;
+  flex: 1;
+}
+
+.suggestion-dialog__translation {
+  font-family: "Lora", Georgia, serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #1A1918;
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.suggestion-dialog__error-msg {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  color: #888780;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Actions bar */
+.suggestion-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid #E2E0DA;
+}
+
+.suggestion-dialog__btn {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  line-height: 1;
+}
+
+.suggestion-dialog__btn--primary {
+  background-color: #E6F1FB;
+  color: #0C447C;
+}
+
+.suggestion-dialog__btn--primary:hover {
+  background-color: #d4e8f7;
+}
+
+.suggestion-dialog__btn--ghost {
+  background-color: transparent;
+  color: #888780;
+  border: 1px solid #E2E0DA;
+}
+
+.suggestion-dialog__btn--ghost:hover {
+  background-color: #F0EEE9;
 }

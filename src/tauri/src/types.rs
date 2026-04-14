@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WordExample {
@@ -53,4 +54,30 @@ pub struct AIWordResponse {
     pub synonyms: Vec<String>,
     pub antonyms: Vec<String>,
     pub contexts: Vec<String>,
+}
+
+/// Text selected by the user, captured by the selection_watcher.
+/// Lives in AppState between detection and the bubble click.
+/// `captured_at`, `cursor_x`, `cursor_y` are read in Phase 4 (dialog placement).
+#[allow(dead_code)]
+pub struct PendingSuggestion {
+    pub original_text: String,
+    pub captured_at: Instant,
+    pub cursor_x: i32,
+    pub cursor_y: i32,
+}
+
+/// Payload for the overlay:text-selected event sent to the frontend.
+#[derive(Serialize, Clone)]
+pub struct TextSelectedPayload {
+    pub text: String,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Response from the suggestion_request command (Phase 3).
+#[derive(Serialize, Deserialize)]
+pub struct SuggestionResponse {
+    pub original: String,
+    pub translation: String,
 }
