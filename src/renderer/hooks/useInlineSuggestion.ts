@@ -42,15 +42,21 @@ export function useInlineSuggestion() {
     }
   }, [])
 
-  // ── Transition to idle — clears all ephemeral state ──────────────────────
+  // ── Transition to idle — clears all ephemeral state and restores button size
+  // Must resize the window back to 48×48 because the dialog may have expanded it.
 
-  const goIdle = useCallback(() => {
+  const goIdle = useCallback(async () => {
     clearAvailableTimer()
     clearReadyTimer()
     setState('idle')
     setOriginal('')
     setTranslation(null)
     setError(null)
+    try {
+      await invoke<void>('overlay_set_size', { width: BTN_SIZE, height: BTN_SIZE })
+    } catch (e) {
+      console.error('[useInlineSuggestion] goIdle resize error:', e)
+    }
   }, [clearAvailableTimer, clearReadyTimer])
 
   // ── Reject / dismiss — also used by ESC key handler and ready-timeout ────
@@ -62,8 +68,7 @@ export function useInlineSuggestion() {
     } catch (e) {
       console.error('[useInlineSuggestion] dismiss error:', e)
     }
-    await invoke<void>('overlay_set_size', { width: BTN_SIZE, height: BTN_SIZE })
-    goIdle()
+    await goIdle()
   }, [clearReadyTimer, goIdle])
 
   // ── Accept — injects translated text into focused app ────────────────────
@@ -73,13 +78,11 @@ export function useInlineSuggestion() {
     clearReadyTimer()
     try {
       await invoke('suggestion_accept', { text: translation })
-      // Rust emits overlay:suggestion-state=idle → goIdle() fires via listener
+      // Rust emits overlay:suggestion-state=idle → goIdle() fires via listener (resize included)
     } catch (e) {
       setError(typeof e === 'string' ? e : 'Erro ao aceitar')
       setState('error')
-      return
     }
-    await invoke<void>('overlay_set_size', { width: BTN_SIZE, height: BTN_SIZE })
   }, [translation, clearReadyTimer])
 
   // ── Bubble click — repositions for dialog, then triggers AI call ─────────
@@ -151,9 +154,9 @@ export function useInlineSuggestion() {
       availableTimerRef.current = setTimeout(goIdle, AVAILABLE_TIMEOUT_MS)
     }).then((fn) => unlisteners.push(fn))
 
-    listen<InlineSuggestionState>('overlay:suggestion-state', (event) => {
+    listen<InlineSuggestionState>('overlay:suggestion-state', async (event) => {
       if (event.payload === 'idle') {
-        goIdle()
+        await goIdle()
       } else {
         setState(event.payload)
       }

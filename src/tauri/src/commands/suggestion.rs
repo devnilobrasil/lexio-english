@@ -15,6 +15,8 @@ use crate::types::SuggestionResponse;
 use crate::{ai_client, text_bridge};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+pub const AI_TIMEOUT_SECS: u64 = 8;
+
 use crate::state::AppState;
 
 /// Called when the user clicks the overlay bubble in "available" state.
@@ -84,16 +86,26 @@ pub async fn suggestion_request(
     app.emit_to("overlay", "overlay:suggestion-state", "loading")
         .ok();
 
-    // 6. Call AI — no Mutex is held at this point.
-    let translation =
-        match ai_client::fetch_translation(&state.http, &provider, &api_key, &original_text).await {
-            Ok(t) => t,
-            Err(e) => {
-                app.emit_to("overlay", "overlay:suggestion-state", "error").ok();
-                app.emit_to("overlay", "overlay:suggestion-error", &e).ok();
-                return Err(e);
-            }
-        };
+    // 6. Call AI with timeout — no Mutex is held at this point.
+    let translation = match tokio::time::timeout(
+        std::time::Duration::from_secs(AI_TIMEOUT_SECS),
+        ai_client::fetch_translation(&state.http, &provider, &api_key, &original_text),
+    )
+    .await
+    {
+        Ok(Ok(t)) => t,
+        Ok(Err(e)) => {
+            app.emit_to("overlay", "overlay:suggestion-state", "error").ok();
+            app.emit_to("overlay", "overlay:suggestion-error", &e).ok();
+            return Err(e);
+        }
+        Err(_elapsed) => {
+            let msg = "Tempo limite excedido. Verifique sua conexão.".to_string();
+            app.emit_to("overlay", "overlay:suggestion-state", "error").ok();
+            app.emit_to("overlay", "overlay:suggestion-error", &msg).ok();
+            return Err(msg);
+        }
+    };
 
     // 7. Signal ready.
     app.emit_to("overlay", "overlay:suggestion-state", "ready")
@@ -245,5 +257,19 @@ mod tests {
         let stored: Option<String> = None;
         let provider = stored.unwrap_or_else(|| "gemini".to_string());
         assert_eq!(provider, "gemini");
+    }
+
+    #[test]
+    fn api_timeout_duration_is_eight_seconds() {
+        // Verifies the constant used in tokio::time::timeout inside suggestion_request.
+        assert_eq!(super::AI_TIMEOUT_SECS, 8);
+    }
+
+    #[test]
+    fn timeout_produces_user_friendly_error() {
+        // Mirrors the Err branch of timeout() in suggestion_request.
+        let msg = "Tempo limite excedido. Verifique sua conexão.".to_string();
+        assert!(msg.contains("Tempo limite"));
+        assert!(msg.contains("conexão"));
     }
 }

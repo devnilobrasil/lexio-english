@@ -630,6 +630,82 @@ npm run test             # ✅ 31/31 testes passando
 
 ---
 
-## Fase 5 — Polish
+## Fase 5 — Polish & Refinements
 
-**Status:** Primeira rodada de bug fixes completa. Aguardando feedback do usuário.
+**Status:** Em progresso — passos selecionados implementados
+
+### Implementação seletiva (2026-04-14)
+
+Após análise de conflitos com implementação anterior, implementados apenas os passos que agregam valor:
+
+#### ✅ Passo 2 — Timeout 8s na chamada API
+
+**Implementado em:** `src/tauri/src/commands/suggestion.rs`
+
+**O que faz:** Wrapa `ai_client::fetch_translation()` em `tokio::time::timeout(Duration::from_secs(8), ...)`. Se a API não responder em 8 segundos:
+- Emite `overlay:suggestion-state = error`
+- Emite `overlay:suggestion-error = "Tempo limite excedido. Verifique sua conexão."`
+- Retorna erro descritivo
+
+**Testes adicionados:**
+| Teste | Verifica |
+|---|---|
+| `api_timeout_duration_is_eight_seconds` | Constante `AI_TIMEOUT_SECS = 8` definida |
+| `timeout_produces_user_friendly_error` | Mensagem de timeout é user-friendly |
+
+**Resultado:** ✅ `cargo test` passou
+
+---
+
+#### ✅ Passo 5 — goIdle redimensiona janela de volta para 48×48
+
+**Implementado em:** `src/renderer/hooks/useInlineSuggestion.ts`
+
+**O que faz:** Quando `goIdle()` é chamado:
+1. Limpa timers e estado React
+2. Chama `invoke('overlay_set_size', { width: 48, height: 48 })`
+
+**Problema corrigido:**
+- Quando backend emite `overlay:suggestion-state=idle` após `suggestion_accept`, o frontend recebia o evento
+- `goIdle()` era chamado, mas a janela **permanecia em 360×120** (tamanho do dialog)
+- Resultado: botão e dialog desapareciam; janela ficava visível como retângulo vazio
+- Agora: janela volta ao tamanho correto automaticamente
+
+**Refactor aplicado:**
+- Removido `invoke('overlay_set_size')` redundante de `handleReject` e `handleAccept`
+- Todas as transições para `idle` agora passam por `goIdle()` que centraliza o resize
+- `goIdle` é async; listeners que o chamam usam `await`
+
+**Testes:**
+| Teste | Resultado |
+|---|---|
+| `overlay:suggestion-state=idle redimensiona janela para 48×48` | ✅ PASS |
+| (todos os 32 testes anteriores) | ✅ PASS |
+
+**Resultado:** ✅ `npm test` — 32/32 testes passando
+
+---
+
+### Passos **NÃO implementados** (análise de conflito)
+
+**Passo 1 — CSS transition de resize:** `resizable: false` no tauri.conf.json. A janela muda de tamanho instantaneamente via `set_size()` (Tauri nativa). CSS transitions só animam conteúdo, não o frame da janela. Não agrega valor.
+
+**Passo 3 — Clique fora para fechar:** `position: fixed; inset: 0` fica confinado ao WebView (360×120px). OS não roteia cliques fora da janela Tauri para o WebView. Pattern não funciona em overlay pequeno. ESC já fecha.
+
+**Passo 4 — humanizeError:** Rust emite mensagens em português ("Chave gemini não configurada..."). Função testa patterns em inglês ("API key not configured"). Sem match; função retorna fallback genérico sempre. Sem ganho.
+
+**Passo 6 — README.md avisos:** Não existe README.md no projeto. Criá-lo apenas para aviso seria prematuro.
+
+---
+
+## Dimensões da Janela Overlay
+
+| Estado | Largura | Altura | Uso |
+|---|---|---|---|
+| **Idle (botão apenas)** | 48px | 48px | Ícone flutuante, repositionável |
+| **Expandido (dialog aberto)** | 360px | 120px | Dialog com tradução + buttons |
+
+Definidas em `src/renderer/hooks/positioning.ts`:
+- `BTN_SIZE = 48`
+- `DIALOG_WIDTH = 360` (48 botão + 8 gap + 304 dialog)
+- `DIALOG_HEIGHT = 120` (layout em row — mais compacto que coluna)

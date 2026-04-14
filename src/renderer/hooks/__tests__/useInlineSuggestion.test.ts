@@ -161,6 +161,20 @@ describe('useInlineSuggestion', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
+  it('overlay:suggestion-state=idle redimensiona janela para 48×48', async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined)
+
+    const { result } = renderHook(() => useInlineSuggestion())
+
+    // Simulate backend emitting idle (e.g. after suggestion_accept completes)
+    await act(async () => {
+      fireEvent('overlay:suggestion-state', 'idle')
+    })
+
+    expect(invoke).toHaveBeenCalledWith('overlay_set_size', { width: 48, height: 48 })
+    expect(result.current.state).toBe('idle')
+  })
+
   it('handleAccept invoca suggestion_accept com a tradução', async () => {
     const mockResponse: SuggestionResponse = { original: 'Olá', translation: 'Hello' }
 
