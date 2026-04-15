@@ -10,6 +10,7 @@
 // CRITICAL RULE: MutexGuard must NEVER be held across an .await.
 // Every lock is acquired and released inside a block scope before any async call.
 
+use crate::ai_client::config::{OLLAMA_BASE_URL_DEFAULT, OLLAMA_MODEL_DEFAULT};
 use crate::db::settings as db_settings;
 use crate::types::SuggestionResponse;
 use crate::{ai_client, text_bridge};
@@ -57,7 +58,7 @@ pub async fn suggestion_request(
     }; // MutexGuard dropped here
 
     // 3. Read the API key for the selected provider — lock dropped before any await.
-    let api_key = {
+    let (api_key, ollama_base_url, ollama_model) = {
         let conn = state
             .db
             .lock()
@@ -65,14 +66,25 @@ pub async fn suggestion_request(
 
         let key = match provider.as_str() {
             "groq" => db_settings::get_groq_api_key(&conn),
+            "ollama" => Ok(Some(String::new())), // ollama doesn't need a key
             _ => db_settings::get_api_key(&conn),
         };
-        key.map_err(|e| format!("DB error: {}", e))?
-            .unwrap_or_default()
+        let key = key.map_err(|e| format!("DB error: {}", e))?
+            .unwrap_or_default();
+
+        let ollama_url = db_settings::get_ollama_base_url(&conn)
+            .map_err(|e| format!("DB error: {}", e))?
+            .unwrap_or_else(|| OLLAMA_BASE_URL_DEFAULT.to_string());
+
+        let ollama_mdl = db_settings::get_ollama_model(&conn)
+            .map_err(|e| format!("DB error: {}", e))?
+            .unwrap_or_else(|| OLLAMA_MODEL_DEFAULT.to_string());
+
+        (key, ollama_url, ollama_mdl)
     }; // MutexGuard dropped here
 
-    // 4. Validate: key must be present for the selected provider.
-    if api_key.is_empty() {
+    // 4. Validate: key must be present for the selected provider (except Ollama).
+    if provider != "ollama" && api_key.is_empty() {
         let msg = format!(
             "Chave {} não configurada. Acesse Configurações.",
             provider
@@ -86,10 +98,20 @@ pub async fn suggestion_request(
     app.emit_to("overlay", "overlay:suggestion-state", "loading")
         .ok();
 
-    // 6. Call AI with timeout — no Mutex is held at this point.
+    // 6. Call AI with timeout — use longer timeout and high-timeout client for local Ollama.
+    let ollama_timeout = 120u64;
+    let timeout_secs = if provider == "ollama" { ollama_timeout } else { AI_TIMEOUT_SECS };
+    let http = if provider == "ollama" { &state.http_local } else { &state.http };
     let translation = match tokio::time::timeout(
-        std::time::Duration::from_secs(AI_TIMEOUT_SECS),
-        ai_client::fetch_translation(&state.http, &provider, &api_key, &original_text),
+        std::time::Duration::from_secs(timeout_secs),
+        ai_client::fetch_translation(
+            http,
+            &provider,
+            &api_key,
+            &original_text,
+            &ollama_base_url,
+            &ollama_model,
+        ),
     )
     .await
     {

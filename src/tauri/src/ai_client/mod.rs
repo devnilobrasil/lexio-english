@@ -7,25 +7,12 @@ use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
 use crate::ai_client::word_prompt::{build_user_prompt, SYSTEM_PROMPT};
 use crate::types::AIWordResponse;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Serialize, Clone)]
+#[derive(Clone)]
 struct ChatMessage {
     role: String,
     content: String,
-}
-
-#[derive(Serialize)]
-struct ChatRequest {
-    model: String,
-    messages: Vec<ChatMessage>,
-    response_format: ResponseFormat,
-}
-
-#[derive(Serialize)]
-struct ResponseFormat {
-    #[serde(rename = "type")]
-    format_type: String,
 }
 
 #[derive(Deserialize)]
@@ -44,17 +31,20 @@ struct ChoiceMessage {
 }
 
 /// Returns `(base_url, model)` for the given provider name.
+/// For Ollama, accepts dynamic base_url and model (user-configured).
 /// Defaults to Gemini for any unrecognised value.
-fn provider_config(provider: &str) -> (&'static str, &'static str) {
+fn provider_config(provider: &str, ollama_url: &str, ollama_model: &str) -> (String, String) {
     match provider {
-        "groq" => (GROQ_BASE_URL, GROQ_MODEL),
-        _ => (GEMINI_BASE_URL, GEMINI_MODEL),
+        "groq" => (GROQ_BASE_URL.to_string(), GROQ_MODEL.to_string()),
+        "ollama" => (ollama_url.to_string(), ollama_model.to_string()),
+        _ => (GEMINI_BASE_URL.to_string(), GEMINI_MODEL.to_string()),
     }
 }
 
 /// Low-level HTTP call to any OpenAI-compatible endpoint.
 /// Returns the raw `content` string from `choices[0].message.content`.
 /// `json_mode`: when true, adds `response_format: { type: "json_object" }`.
+/// `disable_thinking`: when true, adds `think: false` (for Ollama reasoning models).
 async fn call_provider(
     client: &Client,
     base_url: &str,
@@ -62,38 +52,34 @@ async fn call_provider(
     api_key: &str,
     messages: Vec<ChatMessage>,
     json_mode: bool,
+    disable_thinking: bool,
 ) -> Result<String, String> {
-    let response = if json_mode {
-        let request = ChatRequest {
-            model: model.to_string(),
-            messages,
-            response_format: ResponseFormat {
-                format_type: "json_object".to_string(),
-            },
-        };
-        client
-            .post(base_url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?
-    } else {
-        let request = serde_json::json!({
-            "model": model,
-            "messages": messages.iter().map(|m| serde_json::json!({
-                "role": m.role,
-                "content": m.content,
-            })).collect::<Vec<_>>()
-        });
-        client
-            .post(base_url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| format!("HTTP error: {}", e))?
-    };
+    let msgs: Vec<serde_json::Value> = messages
+        .iter()
+        .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
+        .collect();
+
+    let mut body = serde_json::json!({ "model": model, "messages": msgs });
+
+    if json_mode {
+        body["response_format"] = serde_json::json!({ "type": "json_object" });
+    }
+    if disable_thinking {
+        body["think"] = serde_json::json!(false);
+    }
+
+    let mut request = client.post(base_url);
+
+    // Only add Authorization header if api_key is not empty (Ollama doesn't need it)
+    if !api_key.is_empty() {
+        request = request.header("Authorization", format!("Bearer {}", api_key));
+    }
+
+    let response = request
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP error: {}", e))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -115,16 +101,21 @@ async fn call_provider(
 
 /// Fetches word data from the selected AI provider.
 ///
-/// `provider`: "gemini" | "groq" — determines which endpoint and model to use.
-/// `api_key`: the key for the selected provider. Returns an error if empty.
+/// `provider`: "gemini" | "groq" | "ollama" — determines which endpoint and model to use.
+/// `api_key`: the key for the selected provider. Returns an error if empty (except for ollama).
+/// `ollama_url`: base URL for Ollama (ignored for other providers).
+/// `ollama_model`: model name for Ollama (ignored for other providers).
 pub async fn fetch_word(
     client: &Client,
     provider: &str,
     api_key: &str,
     word: &str,
     locale: &str,
+    ollama_url: &str,
+    ollama_model: &str,
 ) -> Result<AIWordResponse, String> {
-    if api_key.is_empty() {
+    // Ollama doesn't need an API key, but other providers do
+    if provider != "ollama" && api_key.is_empty() {
         return Err(format!(
             "Chave {} não configurada. Acesse Configurações.",
             provider
@@ -142,8 +133,10 @@ pub async fn fetch_word(
         },
     ];
 
-    let (base_url, model) = provider_config(provider);
-    let content = call_provider(client, base_url, model, api_key, messages, true).await?;
+    let (base_url, model) = provider_config(provider, ollama_url, ollama_model);
+    let is_ollama = provider == "ollama";
+    // Ollama models don't support response_format: json_object; disable thinking for reasoning models
+    let content = call_provider(client, &base_url, &model, api_key, messages, !is_ollama, is_ollama).await?;
     serde_json::from_str::<AIWordResponse>(&content)
         .map_err(|e| format!("Failed to parse AI response JSON: {}", e))
 }
@@ -151,15 +144,20 @@ pub async fn fetch_word(
 /// Translates `text` to English using the selected AI provider.
 /// Returns plain text (no JSON wrapping).
 ///
-/// `provider`: "gemini" | "groq".
-/// `api_key`: the key for the selected provider. Returns an error if empty.
+/// `provider`: "gemini" | "groq" | "ollama".
+/// `api_key`: the key for the selected provider. Returns an error if empty (except for ollama).
+/// `ollama_url`: base URL for Ollama (ignored for other providers).
+/// `ollama_model`: model name for Ollama (ignored for other providers).
 pub async fn fetch_translation(
     client: &Client,
     provider: &str,
     api_key: &str,
     text: &str,
+    ollama_url: &str,
+    ollama_model: &str,
 ) -> Result<String, String> {
-    if api_key.is_empty() {
+    // Ollama doesn't need an API key, but other providers do
+    if provider != "ollama" && api_key.is_empty() {
         return Err(format!(
             "Chave {} não configurada. Acesse Configurações.",
             provider
@@ -177,8 +175,9 @@ pub async fn fetch_translation(
         },
     ];
 
-    let (base_url, model) = provider_config(provider);
-    call_provider(client, base_url, model, api_key, messages, false).await
+    let (base_url, model) = provider_config(provider, ollama_url, ollama_model);
+    let is_ollama = provider == "ollama";
+    call_provider(client, &base_url, &model, api_key, messages, false, is_ollama).await
 }
 
 #[cfg(test)]
@@ -190,23 +189,32 @@ mod tests {
 
     #[test]
     fn provider_config_groq_returns_groq_constants() {
-        let (url, model) = provider_config("groq");
-        assert_eq!(url, GROQ_BASE_URL);
-        assert_eq!(model, GROQ_MODEL);
+        let (url, model) = provider_config("groq", "", "");
+        assert_eq!(url, GROQ_BASE_URL.to_string());
+        assert_eq!(model, GROQ_MODEL.to_string());
     }
 
     #[test]
     fn provider_config_gemini_returns_gemini_constants() {
-        let (url, model) = provider_config("gemini");
-        assert_eq!(url, GEMINI_BASE_URL);
-        assert_eq!(model, GEMINI_MODEL);
+        let (url, model) = provider_config("gemini", "", "");
+        assert_eq!(url, GEMINI_BASE_URL.to_string());
+        assert_eq!(model, GEMINI_MODEL.to_string());
+    }
+
+    #[test]
+    fn provider_config_ollama_returns_user_url_and_model() {
+        let custom_url = "http://192.168.1.100:11434/v1/chat/completions";
+        let custom_model = "llama3";
+        let (url, model) = provider_config("ollama", custom_url, custom_model);
+        assert_eq!(url, custom_url.to_string());
+        assert_eq!(model, custom_model.to_string());
     }
 
     #[test]
     fn provider_config_unknown_defaults_to_gemini() {
-        let (url, model) = provider_config("openai");
-        assert_eq!(url, GEMINI_BASE_URL);
-        assert_eq!(model, GEMINI_MODEL);
+        let (url, model) = provider_config("openai", "", "");
+        assert_eq!(url, GEMINI_BASE_URL.to_string());
+        assert_eq!(model, GEMINI_MODEL.to_string());
     }
 
     // --- empty key guard ---

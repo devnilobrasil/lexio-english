@@ -9,5 +9,11 @@ pub const GEMINI_MODEL: &str = "gemini-2.5-flash";
 /// Endpoint OpenAI-compatible do GROQ (Auth: Bearer {key})
 pub const GROQ_BASE_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 
-/// LLaMA 3.3 70B via GROQ
-pub const GROQ_MODEL: &str = "llama-3.3-70b-versatile";
+/// GPT-OSS 20B via GROQ (1000 T/sec — fastest production model)
+pub const GROQ_MODEL: &str = "openai/gpt-oss-20b";
+
+/// Endpoint OpenAI-compatible do Ollama (local) (Auth: Bearer {key} or empty)
+pub const OLLAMA_BASE_URL_DEFAULT: &str = "http://localhost:11434/v1/chat/completions";
+
+/// Default model para Ollama — Gemma 4 26B
+pub const OLLAMA_MODEL_DEFAULT: &str = "gemma4:26b";
