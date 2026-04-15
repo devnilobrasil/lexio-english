@@ -63,6 +63,11 @@ fn main() {
             commands::words::set_groq_api_key,
             commands::words::get_selected_provider,
             commands::words::set_selected_provider,
+            commands::words::get_ollama_base_url,
+            commands::words::set_ollama_base_url,
+            commands::words::get_ollama_model,
+            commands::words::set_ollama_model,
+            commands::words::diagnose_ollama, // TODO: remove before release
             // Phase 3 — AI (async)
             commands::words::get_word,
             // Phase 4 — Window controls

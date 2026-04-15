@@ -45,6 +45,22 @@ pub fn set_selected_provider(conn: &Connection, provider: &str) -> rusqlite::Res
     set_setting(conn, "selected_provider", provider)
 }
 
+pub fn get_ollama_base_url(conn: &Connection) -> rusqlite::Result<Option<String>> {
+    get_setting(conn, "ollama_base_url")
+}
+
+pub fn set_ollama_base_url(conn: &Connection, url: &str) -> rusqlite::Result<()> {
+    set_setting(conn, "ollama_base_url", url)
+}
+
+pub fn get_ollama_model(conn: &Connection) -> rusqlite::Result<Option<String>> {
+    get_setting(conn, "ollama_model")
+}
+
+pub fn set_ollama_model(conn: &Connection, model: &str) -> rusqlite::Result<()> {
+    set_setting(conn, "ollama_model", model)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,6 +147,104 @@ mod tests {
         assert_eq!(
             get_selected_provider(&conn).unwrap(),
             Some("groq".to_string())
+        );
+    }
+
+    #[test]
+    fn get_ollama_base_url_returns_none_when_unset() {
+        let conn = in_memory_db();
+        assert_eq!(get_ollama_base_url(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn set_and_get_ollama_base_url_roundtrip() {
+        let conn = in_memory_db();
+        set_ollama_base_url(&conn, "http://localhost:11434").unwrap();
+        assert_eq!(
+            get_ollama_base_url(&conn).unwrap(),
+            Some("http://localhost:11434".to_string())
+        );
+    }
+
+    #[test]
+    fn ollama_base_url_can_be_updated() {
+        let conn = in_memory_db();
+        set_ollama_base_url(&conn, "http://localhost:11434").unwrap();
+        set_ollama_base_url(&conn, "http://192.168.1.100:11434").unwrap();
+        assert_eq!(
+            get_ollama_base_url(&conn).unwrap(),
+            Some("http://192.168.1.100:11434".to_string())
+        );
+    }
+
+    #[test]
+    fn get_ollama_model_returns_none_when_unset() {
+        let conn = in_memory_db();
+        assert_eq!(get_ollama_model(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn set_and_get_ollama_model_roundtrip() {
+        let conn = in_memory_db();
+        set_ollama_model(&conn, "gemma4:26b").unwrap();
+        assert_eq!(
+            get_ollama_model(&conn).unwrap(),
+            Some("gemma4:26b".to_string())
+        );
+    }
+
+    #[test]
+    fn ollama_model_can_be_updated() {
+        let conn = in_memory_db();
+        set_ollama_model(&conn, "gemma4:26b").unwrap();
+        set_ollama_model(&conn, "llama3").unwrap();
+        assert_eq!(
+            get_ollama_model(&conn).unwrap(),
+            Some("llama3".to_string())
+        );
+    }
+
+    #[test]
+    fn ollama_url_and_model_are_independent() {
+        let conn = in_memory_db();
+        set_ollama_base_url(&conn, "http://localhost:11434").unwrap();
+        set_ollama_model(&conn, "gemma4:26b").unwrap();
+        assert_eq!(
+            get_ollama_base_url(&conn).unwrap(),
+            Some("http://localhost:11434".to_string())
+        );
+        assert_eq!(
+            get_ollama_model(&conn).unwrap(),
+            Some("gemma4:26b".to_string())
+        );
+        // Update one shouldn't affect the other
+        set_ollama_base_url(&conn, "http://192.168.1.100:11434").unwrap();
+        assert_eq!(
+            get_ollama_model(&conn).unwrap(),
+            Some("gemma4:26b".to_string())
+        );
+    }
+
+    #[test]
+    fn ollama_settings_are_independent_from_api_keys() {
+        let conn = in_memory_db();
+        set_api_key(&conn, "gemini_key").unwrap();
+        set_groq_api_key(&conn, "groq_key").unwrap();
+        set_ollama_base_url(&conn, "http://localhost:11434").unwrap();
+        set_ollama_model(&conn, "gemma4:26b").unwrap();
+        // All should be retrievable independently
+        assert_eq!(get_api_key(&conn).unwrap(), Some("gemini_key".to_string()));
+        assert_eq!(
+            get_groq_api_key(&conn).unwrap(),
+            Some("groq_key".to_string())
+        );
+        assert_eq!(
+            get_ollama_base_url(&conn).unwrap(),
+            Some("http://localhost:11434".to_string())
+        );
+        assert_eq!(
+            get_ollama_model(&conn).unwrap(),
+            Some("gemma4:26b".to_string())
         );
     }
 }

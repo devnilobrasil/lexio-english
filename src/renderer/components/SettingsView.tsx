@@ -3,12 +3,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '../lib/tauri-bridge'
 
-type Provider = 'gemini' | 'groq'
+type Provider = 'gemini' | 'groq' | 'ollama'
 
 export function SettingsView() {
   const { t } = useTranslation()
   const [apiKey, setApiKey] = useState('')
   const [groqKey, setGroqKey] = useState('')
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState('http://localhost:11434/v1/chat/completions')
+  const [ollamaModel, setOllamaModel] = useState('gemma4:26b')
   const [selectedProvider, setSelectedProvider] = useState<Provider>('gemini')
   const [showKey, setShowKey] = useState(false)
   const [showGroqKey, setShowGroqKey] = useState(false)
@@ -19,8 +21,10 @@ export function SettingsView() {
   useEffect(() => {
     invoke<string | null>('get_api_key').then((key) => { if (key) setApiKey(key) })
     invoke<string | null>('get_groq_api_key').then((key) => { if (key) setGroqKey(key) })
+    invoke<string | null>('get_ollama_base_url').then((url) => { if (url) setOllamaBaseUrl(url) })
+    invoke<string | null>('get_ollama_model').then((model) => { if (model) setOllamaModel(model) })
     invoke<string | null>('get_selected_provider').then((p) => {
-      if (p === 'groq') setSelectedProvider('groq')
+      if (p === 'groq' || p === 'ollama') setSelectedProvider(p as Provider)
     })
     invoke<string>('get_app_version').then(setVersion)
   }, [])
@@ -33,7 +37,9 @@ export function SettingsView() {
     ? groqKey.slice(0, 7) + '•'.repeat(Math.max(0, groqKey.length - 11)) + groqKey.slice(-4)
     : ''
 
-  const canSave = apiKey.trim() || groqKey.trim()
+  const canSave = selectedProvider === 'ollama'
+    ? ollamaBaseUrl.trim() && ollamaModel.trim()
+    : apiKey.trim() || groqKey.trim()
 
   const handleSave = async () => {
     if (!canSave) return
@@ -41,6 +47,8 @@ export function SettingsView() {
     try {
       await invoke<void>('set_api_key', { key: apiKey.trim() })
       await invoke<void>('set_groq_api_key', { key: groqKey.trim() })
+      await invoke<void>('set_ollama_base_url', { url: ollamaBaseUrl.trim() })
+      await invoke<void>('set_ollama_model', { model: ollamaModel.trim() })
       await invoke<void>('set_selected_provider', { provider: selectedProvider })
       setStatus('saved')
       setTimeout(() => setStatus('idle'), 2000)
@@ -64,7 +72,7 @@ export function SettingsView() {
         </label>
 
         <div className="flex gap-4">
-          {(['gemini', 'groq'] as Provider[]).map((p) => (
+          {(['gemini', 'groq', 'ollama'] as Provider[]).map((p) => (
             <label key={p} className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -74,62 +82,112 @@ export function SettingsView() {
                 onChange={() => { setSelectedProvider(p); setStatus('idle') }}
                 className="accent-[var(--color-accent-text)]"
               />
-              <span className="font-sans text-xs text-text-secondary capitalize">{p === 'gemini' ? 'Gemini' : 'GROQ'}</span>
+              <span className="font-sans text-xs text-text-secondary capitalize">
+                {p === 'gemini' ? 'Gemini' : p === 'groq' ? 'GROQ' : 'Ollama'}
+              </span>
             </label>
           ))}
         </div>
       </div>
 
-      {/* Gemini API Key */}
-      <div className="flex flex-col gap-2">
-        <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
-          {t('settings.apiKey')} — Gemini
-        </label>
+      {/* Ollama Configuration (conditional) */}
+      {selectedProvider === 'ollama' && (
+        <>
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
+              {t('settings.ollamaBaseUrl', 'Ollama Base URL')}
+            </label>
 
-        <input
-          ref={inputRef}
-          type={showKey ? 'text' : 'password'}
-          value={showKey ? apiKey : maskedKey}
-          onChange={(e) => { setApiKey(e.target.value); setStatus('idle') }}
-          onFocus={() => setShowKey(true)}
-          onBlur={() => setShowKey(false)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('settings.apiKeyPlaceholder')}
-          className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
-          spellCheck={false}
-          autoComplete="off"
-        />
+            <input
+              type="text"
+              value={ollamaBaseUrl}
+              onChange={(e) => { setOllamaBaseUrl(e.target.value); setStatus('idle') }}
+              onKeyDown={handleKeyDown}
+              placeholder="http://localhost:11434/v1/chat/completions"
+              className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
+              spellCheck={false}
+            />
 
-        <span className="font-sans text-label text-text-faint">
-          {t('settings.apiKeyHelper')}
-        </span>
-      </div>
+            <span className="font-sans text-label text-text-faint">
+              {t('settings.ollamaBaseUrlHelper', 'Default: http://localhost:11434/v1/chat/completions')}
+            </span>
+          </div>
 
-      {/* GROQ API Key */}
-      <div className="flex flex-col gap-2">
-        <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
-          {t('settings.apiKey')} — GROQ
-        </label>
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
+              {t('settings.ollamaModel', 'Ollama Model')}
+            </label>
 
-        <input
-          type={showGroqKey ? 'text' : 'password'}
-          value={showGroqKey ? groqKey : maskedGroqKey}
-          onChange={(e) => { setGroqKey(e.target.value); setStatus('idle') }}
-          onFocus={() => setShowGroqKey(true)}
-          onBlur={() => setShowGroqKey(false)}
-          onKeyDown={handleKeyDown}
-          placeholder="gsk_..."
-          className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
-          spellCheck={false}
-          autoComplete="off"
-        />
+            <input
+              type="text"
+              value={ollamaModel}
+              onChange={(e) => { setOllamaModel(e.target.value); setStatus('idle') }}
+              onKeyDown={handleKeyDown}
+              placeholder="gemma4:26b"
+              className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
+              spellCheck={false}
+            />
 
-        <span className="font-sans text-label text-text-faint">
-          console.groq.com/keys
-        </span>
-      </div>
+            <span className="font-sans text-label text-text-faint">
+              {t('settings.ollamaModelHelper', 'Ex: gemma4:26b, llama3, neural-chat')}
+            </span>
+          </div>
+        </>
+      )}
 
-      {/* Save button — shared for both keys + provider selection */}
+      {/* Gemini API Key and GROQ API Key (only when not Ollama) */}
+      {selectedProvider !== 'ollama' && (
+        <>
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
+              {t('settings.apiKey')} — Gemini
+            </label>
+
+            <input
+              ref={inputRef}
+              type={showKey ? 'text' : 'password'}
+              value={showKey ? apiKey : maskedKey}
+              onChange={(e) => { setApiKey(e.target.value); setStatus('idle') }}
+              onFocus={() => setShowKey(true)}
+              onBlur={() => setShowKey(false)}
+              onKeyDown={handleKeyDown}
+              placeholder={t('settings.apiKeyPlaceholder')}
+              className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
+              spellCheck={false}
+              autoComplete="off"
+            />
+
+            <span className="font-sans text-label text-text-faint">
+              {t('settings.apiKeyHelper')}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-label font-medium text-text-muted uppercase tracking-caps">
+              {t('settings.apiKey')} — GROQ
+            </label>
+
+            <input
+              type={showGroqKey ? 'text' : 'password'}
+              value={showGroqKey ? groqKey : maskedGroqKey}
+              onChange={(e) => { setGroqKey(e.target.value); setStatus('idle') }}
+              onFocus={() => setShowGroqKey(true)}
+              onBlur={() => setShowGroqKey(false)}
+              onKeyDown={handleKeyDown}
+              placeholder="gsk_..."
+              className="w-full font-mono text-xs text-text-secondary border border-border-subtle rounded-md px-3 py-2 bg-surface-raised outline-none focus:border-accent-text/40 transition-colors"
+              spellCheck={false}
+              autoComplete="off"
+            />
+
+            <span className="font-sans text-label text-text-faint">
+              console.groq.com/keys
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* Save button — shared for all providers */}
       <div className="flex justify-end">
         <button
           onClick={handleSave}
