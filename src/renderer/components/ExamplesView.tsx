@@ -2,6 +2,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
+import { useSpeech } from '../hooks/useSpeech'
 import { ExampleItem } from './ExampleItem'
 import { SectionLabel } from './SectionLabel'
 
@@ -11,6 +12,7 @@ interface ExamplesViewProps {
 
 export function ExamplesView({ word }: ExamplesViewProps) {
   const { t } = useTranslation()
+  const { speak, isSpeaking } = useSpeech()
   const allExamples = word.meanings.flatMap(m => m.examples)
 
   if (allExamples.length === 0) {
@@ -28,7 +30,14 @@ export function ExamplesView({ word }: ExamplesViewProps) {
       <SectionLabel>{t('word.examples')}</SectionLabel>
       <div className="flex flex-col gap-1">
         {allExamples.map((ex, i) => (
-          <ExampleItem key={i} example={ex} word={word.word} />
+          <ExampleItem
+            key={i}
+            example={ex}
+            word={word.word}
+            onSpeak={speak}
+            isSpeaking={isSpeaking}
+            testId={`speak-example-${i}`}
+          />
         ))}
       </div>
     </div>

@@ -168,4 +168,46 @@ describe('useSpeech', () => {
     expect(result.current.isSpeaking('churn')).toBe(true)
     expect(result.current.isSpeaking('other')).toBe(false)
   })
+
+  it('ignores onerror from a cancelled previous utterance', () => {
+    const { result } = renderHook(() => useSpeech())
+
+    act(() => {
+      result.current.speak('first')
+    })
+    const first = lastUtterance
+
+    act(() => {
+      result.current.speak('second')
+    })
+    const second = lastUtterance
+
+    act(() => {
+      second?.onstart?.call(second, {} as SpeechSynthesisEvent)
+    })
+    act(() => {
+      // Stale error from the cancelled first utterance
+      first?.onerror?.call(first, {} as SpeechSynthesisErrorEvent)
+    })
+
+    expect(result.current.speaking).toBe(true)
+    expect(result.current.isSpeaking('second')).toBe(true)
+  })
+
+  it('speak on active text stops playback', () => {
+    const { result } = renderHook(() => useSpeech())
+
+    act(() => {
+      result.current.speak('churn')
+    })
+    act(() => {
+      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
+    })
+    act(() => {
+      result.current.speak('churn')
+    })
+
+    expect(result.current.speaking).toBe(false)
+    expect(cancelMock).toHaveBeenCalled()
+  })
 })

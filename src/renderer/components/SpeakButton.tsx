@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next'
 interface SpeakButtonProps {
   onSpeak: () => void
   speaking?: boolean
+  testId?: string
 }
 
-export function SpeakButton({ onSpeak, speaking = false }: SpeakButtonProps) {
+export function SpeakButton({ onSpeak, speaking = false, testId = 'speak-button' }: SpeakButtonProps) {
   const { t } = useTranslation()
 
   return (
@@ -14,7 +15,8 @@ export function SpeakButton({ onSpeak, speaking = false }: SpeakButtonProps) {
       type="button"
       onClick={onSpeak}
       aria-label={t('word.listen')}
-      data-testid="speak-button"
+      aria-pressed={speaking}
+      data-testid={testId}
       className={`flex shrink-0 items-center justify-center w-6 h-6 rounded-sm bg-transparent border border-transparent transition-colors cursor-pointer focus:outline-none focus:border-border-subtle ${
         speaking
           ? 'text-text-primary'
