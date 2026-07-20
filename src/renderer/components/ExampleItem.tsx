@@ -19,17 +19,15 @@ export function ExampleItem({ example, word, onSpeak, isSpeaking, testId }: Exam
 
   return (
     <div className="py-2.5 border-t border-border-muted first:border-t-0 first:pt-0">
-      <div className="flex items-start gap-1.5 mb-1">
-        <p
-          className="example-en font-sans text-example text-text-secondary leading-comfortable flex-1"
-          dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }}
-        />
+      <p className="example-en font-sans text-example text-text-secondary leading-comfortable mb-1">
+        <span dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }} />
         <SpeakButton
           onSpeak={() => onSpeak(example.en)}
           speaking={isSpeaking(example.en)}
           testId={testId}
+          className="ml-1.5"
         />
-      </div>
+      </p>
       <p className="font-sans text-meta text-text-muted leading-normal">
         {example.translation}
       </p>

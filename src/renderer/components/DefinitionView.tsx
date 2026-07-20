@@ -26,16 +26,13 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
           </h1>
           <div className="flex items-center gap-2.5">
             {word.phonetic && (
-              <span className="font-serif text-example italic text-text-muted">
-                {word.phonetic}
-              </span>
+              <>
+                <span className="font-serif text-example italic text-text-muted">
+                  {word.phonetic}
+                </span>
+                <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+              </>
             )}
-            <SpeakButton
-              onSpeak={() => speak(word.word)}
-              speaking={isSpeaking(word.word)}
-              testId="speak-word"
-            />
-            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
             <span className="font-sans text-xs text-text-muted">
               {word.pos}
             </span>
@@ -43,6 +40,12 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
             <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
               {word.level ? t(`level.${word.level}`) : word.level}
             </span>
+            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+            <SpeakButton
+              onSpeak={() => speak(word.word)}
+              speaking={isSpeaking(word.word)}
+              testId="speak-word"
+            />
           </div>
         </div>
 
@@ -82,16 +85,15 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
               {m.meaning_short}
             </p>
             {m.meaning_en && (
-              <div className="flex items-center gap-1.5">
-                <p className="font-sans text-meta italic text-text-muted flex-1">
-                  {m.meaning_en}
-                </p>
+              <p className="font-sans text-meta italic text-text-muted">
+                {m.meaning_en}
                 <SpeakButton
                   onSpeak={() => speak(m.meaning_en)}
                   speaking={isSpeaking(m.meaning_en)}
                   testId={`speak-meaning-${i}`}
+                  className="ml-1.5"
                 />
-              </div>
+              </p>
             )}
           </div>
         ))}
@@ -128,9 +130,11 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
       {word.meanings[0]?.meaning && (
         <div className="mb-1">
           <SectionLabel>{t('word.tip')}</SectionLabel>
-          <p className="font-sans text-meta italic text-text-muted">
-            {word.meanings[0].meaning}
-          </p>
+          <div className="border border-accent-text/15 rounded-md bg-accent-bg/20 px-3 py-2.5">
+            <p className="font-sans text-meta italic text-text-muted">
+              {word.meanings[0].meaning}
+            </p>
+          </div>
         </div>
       )}
     </div>
