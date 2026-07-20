@@ -2,7 +2,9 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
+import { useSpeech } from '../hooks/useSpeech'
 import { SectionLabel } from './SectionLabel'
+import { SpeakButton } from './SpeakButton'
 
 interface DefinitionViewProps {
   word: Word
@@ -12,6 +14,7 @@ interface DefinitionViewProps {
 
 export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: DefinitionViewProps) {
   const { t } = useTranslation()
+  const { speak, isSpeaking } = useSpeech()
 
   return (
     <div className="word-card-enter">
@@ -27,6 +30,7 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
                 {word.phonetic}
               </span>
             )}
+            <SpeakButton onSpeak={() => speak(word.word)} speaking={isSpeaking(word.word)} />
             <div className="w-0.5 h-0.5 rounded-full bg-separator" />
             <span className="font-sans text-xs text-text-muted">
               {word.pos}
@@ -74,9 +78,12 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
               {m.meaning_short}
             </p>
             {m.meaning_en && (
-              <p className="font-sans text-meta italic text-text-muted">
-                {m.meaning_en}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-sans text-meta italic text-text-muted flex-1">
+                  {m.meaning_en}
+                </p>
+                <SpeakButton onSpeak={() => speak(m.meaning_en)} speaking={isSpeaking(m.meaning_en)} />
+              </div>
             )}
           </div>
         ))}

@@ -1,6 +1,8 @@
 // src/renderer/components/ExampleItem.tsx
 import React from 'react'
 import type { WordExample } from '../../types'
+import { useSpeech } from '../hooks/useSpeech'
+import { SpeakButton } from './SpeakButton'
 
 interface ExampleItemProps {
   example: WordExample
@@ -8,6 +10,8 @@ interface ExampleItemProps {
 }
 
 export function ExampleItem({ example, word }: ExampleItemProps) {
+  const { speak, isSpeaking } = useSpeech()
+
   function highlightWord(text: string, target: string): string {
     const re = new RegExp(`\\b(${target}\\w*)\\b`, 'gi')
     return text.replace(re, '<strong>$1</strong>')
@@ -15,10 +19,13 @@ export function ExampleItem({ example, word }: ExampleItemProps) {
 
   return (
     <div className="py-2.5 border-t border-border-muted first:border-t-0 first:pt-0">
-      <p
-        className="example-en font-sans text-example text-text-secondary leading-comfortable mb-1"
-        dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }}
-      />
+      <div className="flex items-start gap-1.5 mb-1">
+        <p
+          className="example-en font-sans text-example text-text-secondary leading-comfortable flex-1"
+          dangerouslySetInnerHTML={{ __html: highlightWord(example.en, word) }}
+        />
+        <SpeakButton onSpeak={() => speak(example.en)} speaking={isSpeaking(example.en)} />
+      </div>
       <p className="font-sans text-meta text-text-muted leading-normal">
         {example.translation}
       </p>
