@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { useSpeech } from '../useSpeech'
+import { pickEnglishVoice, useSpeech } from '../useSpeech'
 
 type UtteranceHandlers = {
   onstart: ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisEvent) => void) | null
@@ -8,33 +8,47 @@ type UtteranceHandlers = {
   onerror: ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisErrorEvent) => void) | null
 }
 
-let lastUtterance: (SpeechSynthesisUtterance & UtteranceHandlers) | null
+function mockVoice(lang: string, name = lang): SpeechSynthesisVoice {
+  return {
+    lang,
+    name,
+    default: false,
+    localService: true,
+    voiceURI: name,
+  } as SpeechSynthesisVoice
+}
+
+let lastUtterance: (SpeechSynthesisUtterance & UtteranceHandlers & { voice: SpeechSynthesisVoice | null }) | null
 let speakMock: ReturnType<typeof vi.fn>
 let cancelMock: ReturnType<typeof vi.fn>
+let getVoicesMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   lastUtterance = null
   speakMock = vi.fn((utterance: SpeechSynthesisUtterance) => {
-    lastUtterance = utterance as SpeechSynthesisUtterance & UtteranceHandlers
+    lastUtterance = utterance as SpeechSynthesisUtterance & UtteranceHandlers & { voice: SpeechSynthesisVoice | null }
   })
   cancelMock = vi.fn()
+  getVoicesMock = vi.fn(() => [])
 
   Object.defineProperty(window, 'speechSynthesis', {
     configurable: true,
     value: {
       speak: speakMock,
       cancel: cancelMock,
-      getVoices: () => [],
+      getVoices: getVoicesMock,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
       paused: false,
       pending: false,
       speaking: false,
     },
   })
 
-  // jsdom may not provide SpeechSynthesisUtterance
   class MockUtterance {
     text: string
     lang = ''
+    voice: SpeechSynthesisVoice | null = null
     onstart: UtteranceHandlers['onstart'] = null
     onend: UtteranceHandlers['onend'] = null
     onerror: UtteranceHandlers['onerror'] = null
@@ -47,6 +61,42 @@ beforeEach(() => {
   Object.defineProperty(window, 'SpeechSynthesisUtterance', {
     configurable: true,
     value: MockUtterance,
+  })
+})
+
+describe('pickEnglishVoice', () => {
+  it('prefers en-US over other English voices', () => {
+    const enUs = mockVoice('en-US', 'Microsoft Aria')
+    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+
+    expect(pickEnglishVoice([ptBr, enGb, enUs])).toBe(enUs)
+  })
+
+  it('falls back to en-GB when en-US is missing', () => {
+    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+
+    expect(pickEnglishVoice([ptBr, enGb])).toBe(enGb)
+  })
+
+  it('falls back to any en-* voice', () => {
+    const enAu = mockVoice('en-AU', 'Karen')
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+
+    expect(pickEnglishVoice([ptBr, enAu])).toBe(enAu)
+  })
+
+  it('returns null when no English voice exists', () => {
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+    const esEs = mockVoice('es-ES', 'Helena')
+
+    expect(pickEnglishVoice([ptBr, esEs])).toBeNull()
+  })
+
+  it('is case-insensitive on lang tags', () => {
+    const enUs = mockVoice('en_us', 'Zira')
+    expect(pickEnglishVoice([enUs])?.name).toBe('Zira')
   })
 })
 
@@ -76,6 +126,36 @@ describe('useSpeech', () => {
 
     expect(lastUtterance?.lang).toBe('en-US')
     expect(lastUtterance?.text).toBe('The churn rate dropped.')
+  })
+
+  it('assigns an English voice when available', () => {
+    const enUs = mockVoice('en-US', 'Microsoft Aria')
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+    getVoicesMock.mockReturnValue([ptBr, enUs])
+
+    const { result } = renderHook(() => useSpeech())
+
+    act(() => {
+      result.current.speak('churn')
+    })
+
+    expect(lastUtterance?.voice).toBe(enUs)
+    expect(lastUtterance?.lang).toBe('en-US')
+  })
+
+  it('does not assign a Portuguese voice when English is available', () => {
+    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
+    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
+    getVoicesMock.mockReturnValue([ptBr, enGb])
+
+    const { result } = renderHook(() => useSpeech())
+
+    act(() => {
+      result.current.speak('churn')
+    })
+
+    expect(lastUtterance?.voice?.lang.toLowerCase().startsWith('en')).toBe(true)
+    expect(lastUtterance?.voice).not.toBe(ptBr)
   })
 
   it('sets speaking true on utterance start', () => {
@@ -186,7 +266,6 @@ describe('useSpeech', () => {
       second?.onstart?.call(second, {} as SpeechSynthesisEvent)
     })
     act(() => {
-      // Stale error from the cancelled first utterance
       first?.onerror?.call(first, {} as SpeechSynthesisErrorEvent)
     })
 
