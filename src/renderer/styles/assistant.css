@@ -1,0 +1,210 @@
+/* src/renderer/styles/assistant.css */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#overlay-root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.assistant-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, #F7F6F3 96%, transparent);
+  border: 1px solid #E2E0DA;
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.assistant-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  background: color-mix(in srgb, #F0EEE9 94%, transparent);
+  border-bottom: 1px solid #E2E0DA;
+  -webkit-app-region: drag;
+  position: relative;
+}
+
+.assistant-wordmark-btn {
+  -webkit-app-region: no-drag;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.assistant-wordmark-btn:hover {
+  opacity: 1;
+}
+
+.assistant-wordmark {
+  height: 20px;
+  pointer-events: none;
+  display: block;
+}
+
+.assistant-title {
+  flex: 1;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #B4B2A9;
+}
+
+.assistant-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+  position: relative;
+}
+
+.assistant-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #888780;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.assistant-icon-btn:hover,
+.assistant-icon-btn[aria-expanded="true"] {
+  background: #ECEAE4;
+  color: #1A1918;
+}
+
+.assistant-icon-btn--copy {
+  background-color: #E6F1FB;
+  color: #0C447C;
+}
+
+.assistant-icon-btn--copy:hover {
+  background-color: #d4e8f7;
+  color: #0C447C;
+}
+
+.assistant-icon-btn--copied {
+  background-color: #E6F1FB;
+  color: #0C447C;
+}
+
+.assistant-icon-btn svg {
+  display: block;
+}
+
+.assistant-info-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E2E0DA;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.assistant-info-popover p {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #2C2C2A;
+  line-height: 1.5;
+}
+
+.assistant-body {
+  flex: 1;
+  padding: 16px 20px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.assistant-hint,
+.assistant-message {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  color: #888780;
+  line-height: 1.5;
+}
+
+.assistant-message--error {
+  color: #8b3a3a;
+}
+
+.assistant-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.assistant-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #E2E0DA;
+  border-top-color: #0C447C;
+  border-radius: 50%;
+  animation: assistant-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes assistant-spin {
+  to { transform: rotate(360deg); }
+}
+
+.assistant-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistant-original {
+  font-family: "Lora", Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 400;
+  color: #888780;
+  line-height: 1.5;
+}
+
+.assistant-translation {
+  font-family: "Lora", Georgia, serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: #1A1918;
+  line-height: 1.55;
+  -webkit-user-select: text;
+  user-select: text;
+}

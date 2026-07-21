@@ -29,20 +29,18 @@
         "focus": true
       },
       {
-        "label": "overlay",
-        "title": "Lexio Overlay",
-        "width": 32,
-        "height": 32,
-        "x": 32,
-        "y": 200,
+        "label": "assistant",
+        "title": "Lexio Assistente",
+        "width": 560,
+        "height": 220,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "shadow": false,
         "skipTaskbar": true,
         "alwaysOnTop": true,
-        "visible": true,
-        "focus": false,
+        "visible": false,
+        "focus": true,
         "url": "overlay.html"
       }
     ],

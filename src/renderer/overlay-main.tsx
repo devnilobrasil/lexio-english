@@ -1,29 +1,38 @@
 // src/renderer/overlay-main.tsx
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import FloatingButton from './components/FloatingButton'
-import { useInlineSuggestion } from './hooks/useInlineSuggestion'
-import './styles/overlay.css'
+import { TranslationPanel } from './components/TranslationPanel'
+import { useTranslationAssistant } from './hooks/useTranslationAssistant'
+import './styles/assistant.css'
 
-function OverlayApp() {
-  const { state, original, translation, error, handleBubbleClick, handleAccept, handleReject } =
-    useInlineSuggestion()
+function AssistantApp() {
+  const {
+    state,
+    original,
+    translation,
+    error,
+    copied,
+    handleCopy,
+    handleClose,
+    handleOpenMain,
+  } = useTranslationAssistant()
 
   return (
-    <FloatingButton
-      suggestionState={state}
-      suggestionOriginal={original}
-      suggestionTranslation={translation}
-      suggestionError={error}
-      onBubbleClick={handleBubbleClick}
-      onSuggestionAccept={handleAccept}
-      onSuggestionReject={handleReject}
+    <TranslationPanel
+      state={state}
+      original={original}
+      translation={translation}
+      error={error}
+      copied={copied}
+      onCopy={handleCopy}
+      onClose={handleClose}
+      onOpenMain={handleOpenMain}
     />
   )
 }
 
 createRoot(document.getElementById('overlay-root')!).render(
   <React.StrictMode>
-    <OverlayApp />
+    <AssistantApp />
   </React.StrictMode>,
 )

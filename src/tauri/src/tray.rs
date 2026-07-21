@@ -6,11 +6,12 @@ use tauri::{
 
 pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Show Lexio", true, None::<&str>)?;
-    let overlay_item = MenuItem::with_id(app, "show_overlay", "Show Overlay", true, None::<&str>)?;
+    let assistant_item =
+        MenuItem::with_id(app, "show_assistant", "Show Assistant", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&show_item, &overlay_item, &separator, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show_item, &assistant_item, &separator, &quit_item])?;
 
     TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
@@ -23,12 +24,14 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                     win.set_focus().ok();
                 }
             }
-            "show_overlay" => {
-                if let Some(overlay) = app.get_webview_window("overlay") {
-                    if overlay.is_visible().unwrap_or(false) {
-                        overlay.hide().ok();
+            "show_assistant" => {
+                if let Some(win) = app.get_webview_window("assistant") {
+                    if win.is_visible().unwrap_or(false) {
+                        win.hide().ok();
                     } else {
-                        overlay.show().ok();
+                        crate::shortcuts::reposition_to_cursor_screen(app, &win);
+                        win.show().ok();
+                        win.set_focus().ok();
                     }
                 }
             }
@@ -36,7 +39,6 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            // Left click on tray icon → show main window
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,

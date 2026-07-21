@@ -4,10 +4,9 @@ mod ai_client;
 mod commands;
 mod db;
 mod lang_detect;
-mod selection_watcher;
+mod selection_provider;
 mod shortcuts;
 mod state;
-mod text_bridge;
 mod tray;
 mod types;
 mod updater;
@@ -29,18 +28,9 @@ fn main() {
             db::init(&conn).expect("failed to initialize database");
             app.manage(AppState::new(conn));
 
-            // Restore the overlay window position saved on the previous run.
-            if let Some((x, y)) = commands::window::load_overlay_position(app.handle()) {
-                if let Some(overlay) = app.get_webview_window("overlay") {
-                    overlay.set_position(tauri::PhysicalPosition { x, y }).ok();
-                }
-            }
-
             shortcuts::register_all(app.handle());
-            selection_watcher::start_watcher(app.handle().clone());
             tray::create_tray(app.handle())?;
 
-            // Check for updates in background — no-op in dev mode (not packaged)
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 updater::check_and_setup(app_handle).await;
@@ -49,7 +39,6 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Phase 2 — DB + Settings
             commands::words::get_history,
             commands::words::get_saved,
             commands::words::save_word,
@@ -67,23 +56,17 @@ fn main() {
             commands::words::set_ollama_base_url,
             commands::words::get_ollama_model,
             commands::words::set_ollama_model,
-            commands::words::diagnose_ollama, // TODO: remove before release
-            // Phase 3 — AI (async)
+            commands::words::diagnose_ollama,
             commands::words::get_word,
-            // Phase 4 — Window controls
             commands::window::close_window,
             commands::window::minimize_window,
             commands::window::resize_window,
             commands::window::get_app_version,
-            commands::window::overlay_set_position,
-            commands::window::overlay_set_size,
-            commands::window::overlay_drag_start,
-            // Phase 5 — Inline translation suggestion commands
-            commands::suggestion::suggestion_request,
-            commands::suggestion::suggestion_accept,
-            commands::suggestion::suggestion_dismiss,
-            // Phase 6 — Auto-updater
             commands::window::install_update,
+            commands::assistant::assistant_translate,
+            commands::assistant::assistant_close,
+            commands::assistant::assistant_open_main,
+            commands::assistant::assistant_copy_to_clipboard,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

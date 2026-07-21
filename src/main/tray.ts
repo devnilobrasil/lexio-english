@@ -3,10 +3,10 @@ import { app, Menu, Tray, nativeImage, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
-export function createTray(win: BrowserWindow, overlay: BrowserWindow): Tray {
+export function createTray(win: BrowserWindow): Tray {
   const iconPath = path.join(__dirname, '../../public/logo/tray.ico')
   let icon
-  
+
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath)
   } else {
@@ -14,60 +14,40 @@ export function createTray(win: BrowserWindow, overlay: BrowserWindow): Tray {
   }
 
   const tray = new Tray(icon)
-  
+
   tray.setToolTip('Lexio — Inglês sob demanda')
-  
+
   const contextMenu = Menu.buildFromTemplate([
-    { 
-      label: 'Abrir Lexio', 
-      click: () => { 
+    {
+      label: 'Abrir Lexio',
+      click: () => {
         win.show()
         win.focus()
-      } 
+      },
     },
     { type: 'separator' },
     {
       label: 'Atalho: ' + (process.platform === 'darwin' ? '⌘+Alt+E' : 'Ctrl+Alt+E'),
-      enabled: false
-    },
-    { type: 'separator' },
-    {
-      label: 'Tradução: Ctrl+Alt+T',
       enabled: false,
     },
     {
-      label: 'Overlay: Ctrl+Alt+O',
+      label: 'Traduzir: ' + (process.platform === 'darwin' ? '⌘+Alt+T' : 'Ctrl+Alt+T'),
       enabled: false,
     },
-    {
-      label: 'Mostrar/Ocultar Overlay',
-      click: () => {
-        if (overlay.isVisible()) {
-          overlay.hide()
-        } else {
-          overlay.show()
-        }
-      },
-    },
     { type: 'separator' },
-    { 
-      label: 'Sair do Lexio', 
+    {
+      label: 'Sair do Lexio',
       click: () => {
         app.quit()
-      } 
-    }
+      },
+    },
   ])
 
   tray.setContextMenu(contextMenu)
 
-  // Clique no ícone abre/foca o app
   tray.on('click', () => {
-    if (win.isVisible()) {
-      win.focus()
-    } else {
-      win.show()
-      win.focus()
-    }
+    win.show()
+    win.focus()
   })
 
   return tray
