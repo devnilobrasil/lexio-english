@@ -79,44 +79,26 @@ export interface LexioAPI {
   installUpdate:      ()                              => void
 }
 
-export type OverlayState = 'idle' | 'loading' | 'success' | 'error'
-
-export type InlineSuggestionState =
+export type AssistantState =
   | 'idle'
-  | 'available'
   | 'loading'
   | 'ready'
   | 'error'
+  | 'no-selection'
+  | 'english-text'
 
-export interface TextSelectedPayload {
-  text: string
-  x: number
-  y: number
-}
-
-export interface SuggestionResponse {
+export interface TranslationResponse {
   original: string
   translation: string
 }
 
-export interface TextSelection {
+export interface AssistantTextReadyPayload {
   text: string
-  programName: string
-  coordinates: { x: number; y: number }
-}
-
-export interface OverlayAPI {
-  onStateChange: (cb: (state: OverlayState) => void) => void
-  onError:       (cb: (message: string) => void) => void
-  translate:     () => void
-  dragStart:     () => void
-  setPosition:   (x: number, y: number) => void
 }
 
 // Augment global window para o renderer reconhecer window.lexio
 declare global {
   interface Window {
     lexio: LexioAPI
-    lexioOverlay: OverlayAPI
   }
 }

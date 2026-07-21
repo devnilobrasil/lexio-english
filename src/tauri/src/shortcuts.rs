@@ -1,9 +1,13 @@
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+use crate::commands::assistant::{classify_selection, SelectionKind};
+use crate::lang_detect;
+use crate::selection_provider;
 
 pub fn register_all(app: &tauri::AppHandle) {
     register_main_toggle(app);
-    register_overlay_toggle(app);
+    register_assistant_translate(app);
 }
 
 fn register_main_toggle(app: &tauri::AppHandle) {
@@ -39,12 +43,12 @@ fn register_main_toggle(app: &tauri::AppHandle) {
         .ok();
 }
 
-fn register_overlay_toggle(app: &tauri::AppHandle) {
+fn register_assistant_translate(app: &tauri::AppHandle) {
     let app_handle = app.clone();
     let shortcut = if cfg!(target_os = "macos") {
-        "Command+Alt+O"
+        "Command+Alt+T"
     } else {
-        "Control+Alt+O"
+        "Control+Alt+T"
     };
 
     app.global_shortcut()
@@ -52,20 +56,42 @@ fn register_overlay_toggle(app: &tauri::AppHandle) {
             if event.state() != ShortcutState::Pressed {
                 return;
             }
-            let Some(overlay) = app_handle.get_webview_window("overlay") else {
-                return;
-            };
-            if overlay.is_visible().unwrap_or(false) {
-                overlay.hide().ok();
-            } else {
-                overlay.show().ok();
-            }
+            let app = app_handle.clone();
+            std::thread::spawn(move || {
+                handle_assistant_hotkey(app);
+            });
         })
         .ok();
 }
 
-fn reposition_to_cursor_screen(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
-    // Try to position on current monitor; fallback to primary if unavailable
+fn handle_assistant_hotkey(app: tauri::AppHandle) {
+    let provider = selection_provider::default_provider();
+    let captured = selection_provider::read_selection(provider.as_ref());
+    let kind = classify_selection(captured, lang_detect::is_likely_english);
+
+    let Some(win) = app.get_webview_window("assistant") else {
+        return;
+    };
+
+    reposition_to_cursor_screen(&app, &win);
+    win.show().ok();
+    win.set_focus().ok();
+
+    match kind {
+        SelectionKind::Ready(text) => {
+            app.emit("assistant:text-ready", serde_json::json!({ "text": text }))
+                .ok();
+        }
+        SelectionKind::English => {
+            app.emit("assistant:english-text", ()).ok();
+        }
+        SelectionKind::Empty | SelectionKind::TooShort | SelectionKind::TooLong => {
+            app.emit("assistant:no-selection", ()).ok();
+        }
+    }
+}
+
+pub fn reposition_to_cursor_screen(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
     let monitor = win
         .current_monitor()
         .ok()
@@ -77,7 +103,10 @@ fn reposition_to_cursor_screen(app: &tauri::AppHandle, win: &tauri::WebviewWindo
         let pos = monitor.position();
         let win_size = win
             .outer_size()
-            .unwrap_or(tauri::PhysicalSize { width: 600, height: 60 });
+            .unwrap_or(tauri::PhysicalSize {
+                width: 560,
+                height: 200,
+            });
         let x = pos.x + (size.width as i32 - win_size.width as i32) / 2;
         let y = pos.y + (size.height as i32 / 4);
         win.set_position(tauri::PhysicalPosition { x, y }).ok();

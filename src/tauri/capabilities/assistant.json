@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "overlay-capability",
-  "description": "Permissions for the Lexio overlay window",
-  "windows": ["overlay"],
+  "identifier": "assistant-capability",
+  "description": "Permissions for the Lexio assistant window",
+  "windows": ["assistant"],
   "permissions": [
     "core:default",
     "core:event:allow-listen",

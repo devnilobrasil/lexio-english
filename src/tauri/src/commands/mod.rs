@@ -1,4 +1,3 @@
-pub mod overlay;
-pub mod suggestion;
+pub mod assistant;
 pub mod window;
 pub mod words;
