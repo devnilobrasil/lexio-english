@@ -1,6 +1,7 @@
 // src/renderer/components/ContentArea.tsx
 import React from 'react'
 import type { Word } from '../../types'
+import type { SpeechController } from '../hooks/useSpeech'
 import type { SidebarView } from './Sidebar'
 import { DefinitionView } from './DefinitionView'
 import { ExamplesView } from './ExamplesView'
@@ -21,6 +22,7 @@ interface ContentAreaProps {
   onSelectWord: (word: string) => void
   onRemoveFromHistory: (word: string) => void
   onUnsaveWord: (word: string) => void
+  speech: SpeechController
 }
 
 export function ContentArea({
@@ -35,6 +37,7 @@ export function ContentArea({
   onSelectWord,
   onRemoveFromHistory,
   onUnsaveWord,
+  speech,
 }: ContentAreaProps) {
   return (
     <div className="content-area">
@@ -62,11 +65,12 @@ export function ContentArea({
           word={word}
           onToggleSaved={onToggleSaved}
           onSelectSynonym={onSelectWord}
+          speech={speech}
         />
       )}
 
       {!loading && !error && word && view === 'examples' && (
-        <ExamplesView word={word} />
+        <ExamplesView word={word} speech={speech} />
       )}
 
       {!loading && !error && word && view === 'synonyms' && (

@@ -14,6 +14,12 @@ export default defineConfig({
     },
   },
   base: './',
+  worker: {
+    format: 'es',
+  },
+  optimizeDeps: {
+    exclude: ['kokoro-js'],
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

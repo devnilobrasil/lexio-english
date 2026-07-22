@@ -1,292 +1,225 @@
-import { renderHook, act } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { pickEnglishVoice, useSpeech } from '../useSpeech'
+import { renderHook, act, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useSpeech } from '../useSpeech'
+import type { KokoroClient } from '../../tts/kokoroClient'
+import type { AudioPlayer } from '../../tts/audioPlayer'
+import type { PcmAudio, TtsStatus } from '../../tts/types'
 
-type UtteranceHandlers = {
-  onstart: ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisEvent) => void) | null
-  onend: ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisEvent) => void) | null
-  onerror: ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisErrorEvent) => void) | null
-}
+vi.mock('../../tts/kokoroClient', () => ({
+  createKokoroClient: vi.fn(),
+}))
 
-function mockVoice(lang: string, name = lang): SpeechSynthesisVoice {
-  return {
-    lang,
-    name,
-    default: false,
-    localService: true,
-    voiceURI: name,
-  } as SpeechSynthesisVoice
-}
+vi.mock('../../tts/audioPlayer', () => ({
+  createAudioPlayer: vi.fn(),
+}))
 
-let lastUtterance: (SpeechSynthesisUtterance & UtteranceHandlers & { voice: SpeechSynthesisVoice | null }) | null
-let speakMock: ReturnType<typeof vi.fn>
-let cancelMock: ReturnType<typeof vi.fn>
-let getVoicesMock: ReturnType<typeof vi.fn>
+import { createKokoroClient } from '../../tts/kokoroClient'
+import { createAudioPlayer } from '../../tts/audioPlayer'
 
-beforeEach(() => {
-  lastUtterance = null
-  speakMock = vi.fn((utterance: SpeechSynthesisUtterance) => {
-    lastUtterance = utterance as SpeechSynthesisUtterance & UtteranceHandlers & { voice: SpeechSynthesisVoice | null }
-  })
-  cancelMock = vi.fn()
-  getVoicesMock = vi.fn(() => [])
+function createMocks() {
+  let status: TtsStatus = 'loading'
+  let resolveInit: (() => void) | null = null
+  let rejectInit: ((error: Error) => void) | null = null
+  let resolveSpeak: ((audio: PcmAudio) => void) | null = null
+  let rejectSpeak: ((error: Error) => void) | null = null
 
-  Object.defineProperty(window, 'speechSynthesis', {
-    configurable: true,
-    value: {
-      speak: speakMock,
-      cancel: cancelMock,
-      getVoices: getVoicesMock,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      paused: false,
-      pending: false,
-      speaking: false,
-    },
-  })
+  let playerOnEnded: (() => void) | undefined
 
-  class MockUtterance {
-    text: string
-    lang = ''
-    voice: SpeechSynthesisVoice | null = null
-    onstart: UtteranceHandlers['onstart'] = null
-    onend: UtteranceHandlers['onend'] = null
-    onerror: UtteranceHandlers['onerror'] = null
-
-    constructor(text: string) {
-      this.text = text
-    }
+  const client: KokoroClient = {
+    initialize: vi.fn(() => new Promise<void>((resolve, reject) => {
+      resolveInit = resolve
+      rejectInit = reject
+    })),
+    speak: vi.fn(() => new Promise<PcmAudio>((resolve, reject) => {
+      resolveSpeak = resolve
+      rejectSpeak = reject
+    })),
+    stop: vi.fn(() => {
+      rejectSpeak?.(new Error('Cancelled'))
+      resolveSpeak = null
+      rejectSpeak = null
+    }),
+    getStatus: vi.fn(() => status),
+    dispose: vi.fn(),
   }
 
-  Object.defineProperty(window, 'SpeechSynthesisUtterance', {
-    configurable: true,
-    value: MockUtterance,
+  const player: AudioPlayer = {
+    play: vi.fn(async (_pcm, _rate, onEnded) => {
+      playerOnEnded = onEnded
+    }),
+    stop: vi.fn(),
+  }
+
+  vi.mocked(createKokoroClient).mockReturnValue(client)
+  vi.mocked(createAudioPlayer).mockReturnValue(player)
+
+  return {
+    client,
+    player,
+    markReady: () => {
+      status = 'ready'
+      resolveInit?.()
+    },
+    markError: (message: string) => {
+      status = 'error'
+      rejectInit?.(new Error(message))
+    },
+    resolveAudio: (pcm = new Float32Array([0.1, 0.2]), sampleRate = 24000) => {
+      resolveSpeak?.({ pcm, sampleRate })
+      resolveSpeak = null
+      rejectSpeak = null
+    },
+    finishPlayback: () => {
+      playerOnEnded?.()
+    },
+  }
+}
+
+describe('useSpeech (Kokoro)', () => {
+  let mocks: ReturnType<typeof createMocks>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks = createMocks()
   })
-})
 
-describe('pickEnglishVoice', () => {
-  it('prefers en-US over other English voices', () => {
-    const enUs = mockVoice('en-US', 'Microsoft Aria')
-    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-
-    expect(pickEnglishVoice([ptBr, enGb, enUs])).toBe(enUs)
-  })
-
-  it('falls back to en-GB when en-US is missing', () => {
-    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-
-    expect(pickEnglishVoice([ptBr, enGb])).toBe(enGb)
-  })
-
-  it('falls back to any en-* voice', () => {
-    const enAu = mockVoice('en-AU', 'Karen')
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-
-    expect(pickEnglishVoice([ptBr, enAu])).toBe(enAu)
-  })
-
-  it('returns null when no English voice exists', () => {
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-    const esEs = mockVoice('es-ES', 'Helena')
-
-    expect(pickEnglishVoice([ptBr, esEs])).toBeNull()
-  })
-
-  it('is case-insensitive on lang tags', () => {
-    const enUs = mockVoice('en_us', 'Zira')
-    expect(pickEnglishVoice([enUs])?.name).toBe('Zira')
-  })
-})
-
-describe('useSpeech', () => {
-  it('starts with speaking false', () => {
+  it('starts loading and becomes ready after preload', async () => {
     const { result } = renderHook(() => useSpeech())
+
+    expect(result.current.status).toBe('loading')
+    expect(result.current.speaking).toBe(false)
+    expect(mocks.client.initialize).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      mocks.markReady()
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe('ready')
+    })
+  })
+
+  it('does not speak while loading', async () => {
+    const { result } = renderHook(() => useSpeech())
+
+    await act(async () => {
+      result.current.speak('churn')
+    })
+
+    expect(mocks.client.speak).not.toHaveBeenCalled()
+    expect(mocks.player.play).not.toHaveBeenCalled()
+  })
+
+  it('speaks through kokoro and audio player when ready', async () => {
+    const { result } = renderHook(() => useSpeech())
+
+    await act(async () => {
+      mocks.markReady()
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      result.current.speak('churn')
+    })
+
+    expect(mocks.client.speak).toHaveBeenCalledWith('churn')
+
+    await act(async () => {
+      mocks.resolveAudio()
+    })
+
+    await waitFor(() => {
+      expect(mocks.player.play).toHaveBeenCalled()
+      expect(result.current.speaking).toBe(true)
+      expect(result.current.isSpeaking('churn')).toBe(true)
+    })
+  })
+
+  it('toggles off when speaking the same active text', async () => {
+    const { result } = renderHook(() => useSpeech())
+
+    await act(async () => {
+      mocks.markReady()
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      result.current.speak('churn')
+    })
+    await act(async () => {
+      mocks.resolveAudio()
+    })
+    await waitFor(() => expect(result.current.speaking).toBe(true))
+
+    await act(async () => {
+      result.current.speak('churn')
+    })
+
+    expect(mocks.client.stop).toHaveBeenCalled()
+    expect(mocks.player.stop).toHaveBeenCalled()
     expect(result.current.speaking).toBe(false)
   })
 
-  it('cancels any ongoing speech before speaking', () => {
+  it('stop clears speaking state', async () => {
     const { result } = renderHook(() => useSpeech())
 
-    act(() => {
+    await act(async () => {
+      mocks.markReady()
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
       result.current.speak('churn')
     })
-
-    expect(cancelMock).toHaveBeenCalledTimes(1)
-    expect(speakMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('sets utterance lang to en-US', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('The churn rate dropped.')
+    await act(async () => {
+      mocks.resolveAudio()
     })
+    await waitFor(() => expect(result.current.speaking).toBe(true))
 
-    expect(lastUtterance?.lang).toBe('en-US')
-    expect(lastUtterance?.text).toBe('The churn rate dropped.')
-  })
-
-  it('assigns an English voice when available', () => {
-    const enUs = mockVoice('en-US', 'Microsoft Aria')
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-    getVoicesMock.mockReturnValue([ptBr, enUs])
-
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-
-    expect(lastUtterance?.voice).toBe(enUs)
-    expect(lastUtterance?.lang).toBe('en-US')
-  })
-
-  it('does not assign a Portuguese voice when English is available', () => {
-    const enGb = mockVoice('en-GB', 'Microsoft Sonia')
-    const ptBr = mockVoice('pt-BR', 'Microsoft Maria')
-    getVoicesMock.mockReturnValue([ptBr, enGb])
-
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-
-    expect(lastUtterance?.voice?.lang.toLowerCase().startsWith('en')).toBe(true)
-    expect(lastUtterance?.voice).not.toBe(ptBr)
-  })
-
-  it('sets speaking true on utterance start', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-
-    expect(result.current.speaking).toBe(true)
-  })
-
-  it('sets speaking false on utterance end', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-    act(() => {
-      lastUtterance?.onend?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-
-    expect(result.current.speaking).toBe(false)
-  })
-
-  it('sets speaking false on utterance error', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-    act(() => {
-      lastUtterance?.onerror?.call(lastUtterance, {} as SpeechSynthesisErrorEvent)
-    })
-
-    expect(result.current.speaking).toBe(false)
-  })
-
-  it('second speak cancels the previous utterance', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('first')
-    })
-    act(() => {
-      result.current.speak('second')
-    })
-
-    expect(cancelMock).toHaveBeenCalledTimes(2)
-    expect(lastUtterance?.text).toBe('second')
-  })
-
-  it('stop cancels speech and clears speaking', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-    act(() => {
+    await act(async () => {
       result.current.stop()
     })
 
-    expect(cancelMock).toHaveBeenCalled()
+    expect(result.current.speaking).toBe(false)
+    expect(mocks.player.stop).toHaveBeenCalled()
+  })
+
+  it('clears speaking when playback ends', async () => {
+    const { result } = renderHook(() => useSpeech())
+
+    await act(async () => {
+      mocks.markReady()
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      result.current.speak('churn')
+    })
+    await act(async () => {
+      mocks.resolveAudio()
+    })
+    await waitFor(() => expect(result.current.speaking).toBe(true))
+
+    await act(async () => {
+      mocks.finishPlayback()
+    })
+
     expect(result.current.speaking).toBe(false)
   })
 
-  it('isSpeaking is true only for the active text', () => {
+  it('exposes error status when engine fails to preload', async () => {
     const { result } = renderHook(() => useSpeech())
 
-    act(() => {
-      result.current.speak('churn')
-    })
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
+    await act(async () => {
+      mocks.markError('model missing')
     })
 
-    expect(result.current.isSpeaking('churn')).toBe(true)
-    expect(result.current.isSpeaking('other')).toBe(false)
+    await waitFor(() => {
+      expect(result.current.status).toBe('error')
+    })
   })
 
-  it('ignores onerror from a cancelled previous utterance', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('first')
-    })
-    const first = lastUtterance
-
-    act(() => {
-      result.current.speak('second')
-    })
-    const second = lastUtterance
-
-    act(() => {
-      second?.onstart?.call(second, {} as SpeechSynthesisEvent)
-    })
-    act(() => {
-      first?.onerror?.call(first, {} as SpeechSynthesisErrorEvent)
-    })
-
-    expect(result.current.speaking).toBe(true)
-    expect(result.current.isSpeaking('second')).toBe(true)
-  })
-
-  it('speak on active text stops playback', () => {
-    const { result } = renderHook(() => useSpeech())
-
-    act(() => {
-      result.current.speak('churn')
-    })
-    act(() => {
-      lastUtterance?.onstart?.call(lastUtterance, {} as SpeechSynthesisEvent)
-    })
-    act(() => {
-      result.current.speak('churn')
-    })
-
-    expect(result.current.speaking).toBe(false)
-    expect(cancelMock).toHaveBeenCalled()
+  it('never references speechSynthesis', () => {
+    expect(String(useSpeech)).not.toMatch(/speechSynthesis/)
   })
 })

@@ -1,105 +1,95 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { createKokoroClient } from '../tts/kokoroClient'
+import { createAudioPlayer } from '../tts/audioPlayer'
+import type { TtsStatus } from '../tts/types'
 
-function normalizeLang(lang: string): string {
-  return lang.trim().toLowerCase().replace(/_/g, '-')
+export interface SpeechController {
+  speak: (text: string) => void
+  stop: () => void
+  speaking: boolean
+  isSpeaking: (text: string) => boolean
+  status: TtsStatus
 }
 
-/** Prefer en-US, then en-GB, then any en-* voice. Never pick pt/es/etc. */
-export function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const english = voices.filter((v) => normalizeLang(v.lang).startsWith('en'))
-  if (english.length === 0) return null
-
-  const enUs = english.find((v) => normalizeLang(v.lang) === 'en-us')
-  if (enUs) return enUs
-
-  const enGb = english.find((v) => normalizeLang(v.lang) === 'en-gb')
-  if (enGb) return enGb
-
-  return english[0] ?? null
-}
-
-export function useSpeech() {
+export function useSpeech(): SpeechController {
   const [activeText, setActiveText] = useState<string | null>(null)
+  const [status, setStatus] = useState<TtsStatus>('loading')
   const generationRef = useRef(0)
-  const englishVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
+  const clientRef = useRef(createKokoroClient())
+  const playerRef = useRef(createAudioPlayer())
 
   useEffect(() => {
-    if (!window.speechSynthesis) return
+    const client = clientRef.current
+    const player = playerRef.current
+    let cancelled = false
 
-    const refreshVoices = () => {
-      englishVoiceRef.current = pickEnglishVoice(window.speechSynthesis.getVoices())
-    }
-
-    refreshVoices()
-    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices)
+    client
+      .initialize()
+      .then(() => {
+        if (!cancelled) setStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('error')
+      })
 
     return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices)
-      window.speechSynthesis.cancel()
+      cancelled = true
+      generationRef.current += 1
+      client.dispose()
+      player.stop()
     }
   }, [])
 
   const stop = useCallback(() => {
     generationRef.current += 1
-    window.speechSynthesis.cancel()
+    clientRef.current.stop()
+    playerRef.current.stop()
     setActiveText(null)
   }, [])
 
   const speak = useCallback((text: string) => {
-    if (!window.speechSynthesis) return
+    if (status !== 'ready') return
 
     const trimmed = text.trim()
     if (!trimmed) return
 
-    // Toggle: clicking the same active text stops playback
     if (activeText === trimmed) {
       stop()
       return
     }
 
     const generation = ++generationRef.current
-    window.speechSynthesis.cancel()
+    clientRef.current.stop()
+    playerRef.current.stop()
+    setActiveText(trimmed)
 
-    // Voices can load late — refresh on each speak if we don't have one yet
-    const voice =
-      englishVoiceRef.current ??
-      pickEnglishVoice(window.speechSynthesis.getVoices())
-    if (voice) {
-      englishVoiceRef.current = voice
-    }
-
-    const utterance = new SpeechSynthesisUtterance(trimmed)
-    // Prefer explicit English voice; lang alone is ignored by many Windows installs
-    if (voice) {
-      utterance.voice = voice
-      utterance.lang = voice.lang.replace(/_/g, '-')
-    } else {
-      utterance.lang = 'en-US'
-    }
-
-    utterance.onstart = () => {
-      if (generationRef.current === generation) {
-        setActiveText(trimmed)
-      }
-    }
-    utterance.onend = () => {
-      if (generationRef.current === generation) {
-        setActiveText(null)
-      }
-    }
-    utterance.onerror = () => {
-      if (generationRef.current === generation) {
-        setActiveText(null)
-      }
-    }
-
-    window.speechSynthesis.speak(utterance)
-  }, [activeText, stop])
+    void clientRef.current
+      .speak(trimmed)
+      .then(async (audio) => {
+        if (generationRef.current !== generation) return
+        await playerRef.current.play(audio.pcm, audio.sampleRate, () => {
+          if (generationRef.current === generation) {
+            setActiveText(null)
+          }
+        })
+      })
+      .catch(() => {
+        if (generationRef.current === generation) {
+          setActiveText(null)
+        }
+      })
+  }, [activeText, status, stop])
 
   const isSpeaking = useCallback(
     (text: string) => activeText === text.trim(),
     [activeText],
   )
 
-  return { speak, stop, speaking: activeText !== null, isSpeaking }
+  return {
+    speak,
+    stop,
+    speaking: activeText !== null,
+    isSpeaking,
+    status,
+  }
 }

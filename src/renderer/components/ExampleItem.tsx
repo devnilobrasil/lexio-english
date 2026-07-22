@@ -1,6 +1,6 @@
-// src/renderer/components/ExampleItem.tsx
 import React from 'react'
 import type { WordExample } from '../../types'
+import type { TtsStatus } from '../tts/types'
 import { SpeakButton } from './SpeakButton'
 
 interface ExampleItemProps {
@@ -8,10 +8,18 @@ interface ExampleItemProps {
   word: string
   onSpeak: (text: string) => void
   isSpeaking: (text: string) => boolean
+  status: TtsStatus
   testId?: string
 }
 
-export function ExampleItem({ example, word, onSpeak, isSpeaking, testId }: ExampleItemProps) {
+export function ExampleItem({
+  example,
+  word,
+  onSpeak,
+  isSpeaking,
+  status,
+  testId,
+}: ExampleItemProps) {
   function highlightWord(text: string, target: string): string {
     const re = new RegExp(`\\b(${target}\\w*)\\b`, 'gi')
     return text.replace(re, '<strong>$1</strong>')
@@ -24,6 +32,7 @@ export function ExampleItem({ example, word, onSpeak, isSpeaking, testId }: Exam
         <SpeakButton
           onSpeak={() => onSpeak(example.en)}
           speaking={isSpeaking(example.en)}
+          status={status}
           testId={testId}
           className="ml-1.5"
         />

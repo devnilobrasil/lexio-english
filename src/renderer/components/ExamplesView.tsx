@@ -1,18 +1,18 @@
-// src/renderer/components/ExamplesView.tsx
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
-import { useSpeech } from '../hooks/useSpeech'
+import type { SpeechController } from '../hooks/useSpeech'
 import { ExampleItem } from './ExampleItem'
 import { SectionLabel } from './SectionLabel'
 
 interface ExamplesViewProps {
   word: Word
+  speech: SpeechController
 }
 
-export function ExamplesView({ word }: ExamplesViewProps) {
+export function ExamplesView({ word, speech }: ExamplesViewProps) {
   const { t } = useTranslation()
-  const { speak, isSpeaking } = useSpeech()
+  const { speak, isSpeaking, status } = speech
   const allExamples = word.meanings.flatMap(m => m.examples)
 
   if (allExamples.length === 0) {
@@ -36,6 +36,7 @@ export function ExamplesView({ word }: ExamplesViewProps) {
             word={word.word}
             onSpeak={speak}
             isSpeaking={isSpeaking}
+            status={status}
             testId={`speak-example-${i}`}
           />
         ))}
