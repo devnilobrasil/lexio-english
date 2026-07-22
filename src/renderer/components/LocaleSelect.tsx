@@ -30,15 +30,15 @@ export function LocaleSelect() {
         <Select.Content
           position="popper"
           sideOffset={6}
-          className="bg-surface-raised border border-border-subtle rounded-md py-1 z-50 w-10"
+          className="bg-surface-raised border border-border-subtle rounded-md p-1 z-50"
         >
-          <Select.Viewport>
+          <Select.Viewport className="flex flex-row items-center gap-0.5">
             {LOCALE_OPTIONS.map(opt => (
               <Select.Item
                 key={opt.value}
                 value={opt.value}
                 data-testid={`locale-option-${opt.value}`}
-                className="flex items-center justify-center px-2 py-2 cursor-pointer hover:bg-surface-hover focus:bg-surface-hover focus:outline-none transition-colors"
+                className="flex items-center justify-center w-8 h-8 cursor-pointer rounded-sm hover:bg-surface-hover focus:bg-surface-hover focus:outline-none transition-colors"
               >
                 <span className={`fi fi-${opt.countryCode} fis text-lg leading-none rounded-full`} />
               </Select.Item>

@@ -1,6 +1,6 @@
 // src/renderer/hooks/useTranslationAssistant.ts
 //
-// Lifecycle of the Lexio assistant window:
+// Lifecycle of the Lexio translate mode panel:
 //   idle → loading → ready | error
 //   idle → no-selection | english-text (from hotkey feedback)
 
@@ -36,24 +36,6 @@ export function useTranslationAssistant() {
   }, [clearCopiedTimer])
 
   const handleClose = useCallback(async () => {
-    try {
-      await invoke('assistant_close')
-    } catch (e) {
-      console.error('[useTranslationAssistant] close error:', e)
-    }
-    resetCopied()
-    setState('idle')
-    setOriginal('')
-    setTranslation(null)
-    setError(null)
-  }, [resetCopied])
-
-  const handleOpenMain = useCallback(async () => {
-    try {
-      await invoke('assistant_open_main')
-    } catch (e) {
-      console.error('[useTranslationAssistant] open main error:', e)
-    }
     resetCopied()
     setState('idle')
     setOriginal('')
@@ -131,5 +113,5 @@ export function useTranslationAssistant() {
     return () => window.removeEventListener('keydown', handler)
   }, [state, handleClose])
 
-  return { state, original, translation, error, copied, handleCopy, handleClose, handleOpenMain }
+  return { state, original, translation, error, copied, handleCopy, handleClose }
 }

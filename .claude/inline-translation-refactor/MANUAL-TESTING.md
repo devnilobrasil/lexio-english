@@ -1,18 +1,18 @@
-# Manual Testing — Lexio Assistant
+# Manual Testing — Lexio Mode Tabs (unified window)
 
-**Branch:** `feat/inline-translation-refactor`  
+**Branch:** `feat/unify-mode-tabs`  
 **Atalhos:**
 
 | Atalho | Função |
 |---|---|
-| `Ctrl+Alt+E` | Toggle janela principal (dicionário) |
-| `Ctrl+Alt+T` | Traduzir seleção (assistente) |
+| `Ctrl+Alt+E` | Toggle show/hide da janela principal (mantém a aba atual) |
+| `Ctrl+Alt+T` | Captura seleção, foca a main e abre a aba **Traduzir** |
 
 ---
 
 ## Pré-requisitos
 
-1. Worktree: `.worktrees/feat-inline-translation-refactor`
+1. Worktree: `.worktrees/feat-unify-mode-tabs`
 2. `npm run dev` (Tauri)
 3. Chave API configurada em Configurações (Gemini/Groq) **ou** Ollama local
 4. Notepad (ou app com TextPattern UIA)
@@ -21,42 +21,41 @@
 
 ## Checklist
 
-### Happy path
+### Titlebar
+- [ ] Uma linha: Logo | Dicionário | Traduzir | … | ações | min/close
+- [ ] Logo sem clique (só marca)
+- [ ] Em Dicionário: ícone expand/recolher + LocaleSelect
+- [ ] Em Traduzir: Copiar (quando ready) + Info; sem LocaleSelect
+- [ ] SearchBar (Dicionário) ocupa toda a largura (só input)
+
+### Abas / resize
+- [ ] Idle (~110px) mostra titlebar + SearchBar
+- [ ] Trocar para Traduzir redimensiona (~320px)
+- [ ] Voltar a Dicionário restaura idle ou result conforme estado
+
+### Happy path (Traduzir)
 - [ ] Selecionar texto em **português** no Notepad
 - [ ] Premir `Ctrl+Alt+T`
-- [ ] Janela assistente abre (visual Lexio shell, com blur suave)
-- [ ] Mostra loading → tradução
-- [ ] **Ícone Copiar** (header, azul) copia e muda para check ~2s
-- [ ] **×** / ícone fechar (ou ESC) esconde a janela
-- [ ] Ícone **info** mostra texto informativo (modo + limite de cobertura)
+- [ ] Main foca na aba Traduzir (sem segunda janela)
+- [ ] Mostra loading → tradução no corpo (sem header interno)
+- [ ] Ícone Copiar na titlebar (azul) copia e muda para check ~2s
+- [ ] ESC limpa o painel (não esconde a app)
+- [ ] Ícone info na titlebar mostra texto sobre cobertura UIA
 
-### Sem seleção
-- [ ] Sem texto selecionado → `Ctrl+Alt+T`
-- [ ] Mensagem: selecione texto primeiro
-- [ ] Fechar funciona
+### Sem seleção / inglês
+- [ ] Sem seleção → mensagem para selecionar texto
+- [ ] Inglês longo → mensagem de texto em inglês
 
-### Inglês
-- [ ] Selecionar frase longa em inglês → `Ctrl+Alt+T`
-- [ ] Mensagem: texto em inglês detectado (não traduz)
+### Dicionário isolado
+- [ ] Buscar uma palavra na aba Dicionário
+- [ ] `Ctrl+Alt+T` muda para Traduzir
+- [ ] Voltar a Dicionário mantém o resultado da busca
+- [ ] Ícone expand/recolher alterna idle ↔ result
 
-### Isolamento da main
-- [ ] Abrir dicionário (`Ctrl+Alt+E`), buscar uma palavra
-- [ ] Em paralelo, traduzir seleção com `Ctrl+Alt+T`
-- [ ] Janela main **não** perde o resultado da busca
+### Tray
+- [ ] Menu do tray: Show Lexio + Quit (sem Show Assistant)
 
-### Apps sem UIA
-- [ ] Terminal / app sem TextPattern → `Ctrl+Alt+T`
-- [ ] Comportamento: no-selection (silent fail de UIA)
-
-### Clipboard
-- [ ] Copiar algo para o clipboard antes
-- [ ] Traduzir seleção (UIA — clipboard do utilizador **não** deve ser usado na captura)
-- [ ] Após **Copiar** no assistente, clipboard = tradução
-
----
-
-## O que NÃO testar (removido)
-
-- Bubble flutuante / drag para selecionar
-- Aceitar / inject no campo fonte
-- Overlay `Ctrl+Alt+O`
+### O que NÃO deve existir
+- [ ] Sem janela `assistant` separada
+- [ ] Sem `overlay.html` / bubble
+- [ ] Sem barra interna “Tradução” / X no painel

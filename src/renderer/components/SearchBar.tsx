@@ -1,18 +1,14 @@
 // src/renderer/components/SearchBar.tsx
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LocaleSelect } from './LocaleSelect'
-import { WindowControls } from './WindowControls'
-import wordmark from '../../assets/lexio-wordmark.png'
 
 interface SearchBarProps {
   onSearch: (query: string) => void
   onEscape: () => void
-  onLogoClick?: () => void
   loading?: boolean
 }
 
-export function SearchBar({ onSearch, onEscape, onLogoClick, loading }: SearchBarProps) {
+export function SearchBar({ onSearch, onEscape, loading }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const { t } = useTranslation()
@@ -21,7 +17,6 @@ export function SearchBar({ onSearch, onEscape, onLogoClick, loading }: SearchBa
     inputRef.current?.focus()
   }, [])
 
-  // Re-focus when window gains focus
   useEffect(() => {
     const handleFocus = () => inputRef.current?.focus()
     window.addEventListener('focus', handleFocus)
@@ -42,21 +37,13 @@ export function SearchBar({ onSearch, onEscape, onLogoClick, loading }: SearchBa
   }
 
   return (
-    <div className="search-bar h-full">
-      <img
-        src={wordmark}
-        alt="Lexio"
-        className="h-6 opacity-80 shrink-0 cursor-pointer hover:opacity-100 transition-opacity"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        onClick={onLogoClick}
-      />
-
+    <div className="search-bar">
       <input
         ref={inputRef}
         data-testid="search-input"
         type="text"
         placeholder={t('search.placeholder')}
-        className="flex-1 font-sans text-sm text-text-primary border-none outline-none placeholder:text-text-faint mx-4 px-4 rounded-xl h-8 bg-text-faint/25"
+        className="flex-1 font-sans text-sm text-text-primary border-none outline-none placeholder:text-text-faint px-4 rounded-xl h-8 bg-text-faint/25"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -65,9 +52,6 @@ export function SearchBar({ onSearch, onEscape, onLogoClick, loading }: SearchBa
         autoComplete="off"
         disabled={loading}
       />
-
-      <LocaleSelect />
-      <WindowControls />
     </div>
   )
 }
