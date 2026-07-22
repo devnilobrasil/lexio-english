@@ -76,6 +76,16 @@ fn handle_assistant_hotkey(app: tauri::AppHandle) {
     if win.is_minimized().unwrap_or(false) {
         win.unminimize().ok();
     }
+
+    // Resize before show so translate mode is not clipped at idle height.
+    if let Some(height) = crate::commands::window::height_for_state("translate") {
+        win.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+            width: 720,
+            height,
+        }))
+        .ok();
+    }
+
     reposition_to_cursor_screen(&app, &win);
     win.set_skip_taskbar(false).ok();
     win.show().ok();
@@ -109,7 +119,7 @@ pub fn reposition_to_cursor_screen(app: &tauri::AppHandle, win: &tauri::WebviewW
             .outer_size()
             .unwrap_or(tauri::PhysicalSize {
                 width: 720,
-                height: 110,
+                height: 320,
             });
         let x = pos.x + (size.width as i32 - win_size.width as i32) / 2;
         let y = pos.y + (size.height as i32 / 4);

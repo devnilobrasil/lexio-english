@@ -1,5 +1,5 @@
 // src/renderer/hooks/useAppMode.ts
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { resizeStateFor, type AppMode } from '../lib/appMode'
 import type { WindowResizeState } from '../lib/appMode'
@@ -17,10 +17,12 @@ export function useAppMode(
   dictState: DictState,
 ) {
   const [appMode, setAppMode] = useState<AppMode>('dictionary')
+  const resizeRef = useRef(resize)
+  resizeRef.current = resize
 
   const applyResize = useCallback((mode: AppMode, state: DictState) => {
-    resize(resizeStateFor(mode, state))
-  }, [resize])
+    resizeRef.current(resizeStateFor(mode, state))
+  }, [])
 
   const handleModeChange = useCallback((mode: AppMode) => {
     setAppMode(mode)
@@ -29,14 +31,26 @@ export function useAppMode(
 
   useEffect(() => {
     const unlisteners: Array<() => void> = []
+    let cancelled = false
+
     for (const event of ASSISTANT_EVENTS) {
       listen(event, () => {
         setAppMode('translate')
-        resize('translate')
-      }).then((fn) => unlisteners.push(fn))
+        resizeRef.current('translate')
+      }).then((fn) => {
+        if (cancelled) {
+          fn()
+          return
+        }
+        unlisteners.push(fn)
+      })
     }
-    return () => unlisteners.forEach((fn) => fn())
-  }, [resize])
+
+    return () => {
+      cancelled = true
+      unlisteners.forEach((fn) => fn())
+    }
+  }, [])
 
   useEffect(() => {
     applyResize(appMode, dictState)
