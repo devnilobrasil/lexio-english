@@ -1,21 +1,28 @@
-// src/renderer/components/DefinitionView.tsx
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
+import type { SpeechController } from '../hooks/useSpeech'
 import { SectionLabel } from './SectionLabel'
+import { SpeakButton } from './SpeakButton'
 
 interface DefinitionViewProps {
   word: Word
   onToggleSaved: () => void
   onSelectSynonym: (synonym: string) => void
+  speech: SpeechController
 }
 
-export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: DefinitionViewProps) {
+export function DefinitionView({
+  word,
+  onToggleSaved,
+  onSelectSynonym,
+  speech,
+}: DefinitionViewProps) {
   const { t } = useTranslation()
+  const { speak, isSpeaking, status } = speech
 
   return (
     <div className="word-card-enter">
-      {/* Word Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <h1 className="font-serif text-word-title font-semibold text-text-primary leading-none mb-3 tracking-title">
@@ -23,11 +30,13 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
           </h1>
           <div className="flex items-center gap-2.5">
             {word.phonetic && (
-              <span className="font-serif text-example italic text-text-muted">
-                {word.phonetic}
-              </span>
+              <>
+                <span className="font-serif text-example italic text-text-muted">
+                  {word.phonetic}
+                </span>
+                <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+              </>
             )}
-            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
             <span className="font-sans text-xs text-text-muted">
               {word.pos}
             </span>
@@ -35,6 +44,13 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
             <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
               {word.level ? t(`level.${word.level}`) : word.level}
             </span>
+            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+            <SpeakButton
+              onSpeak={() => speak(word.word)}
+              speaking={isSpeaking(word.word)}
+              status={status}
+              testId="speak-word"
+            />
           </div>
         </div>
 
@@ -62,7 +78,6 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
         </button>
       </div>
 
-      {/* Meanings */}
       <div className="mb-5">
         <SectionLabel>{t('word.meaning')}</SectionLabel>
         {word.meanings.map((m, i) => (
@@ -76,24 +91,30 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
             {m.meaning_en && (
               <p className="font-sans text-meta italic text-text-muted">
                 {m.meaning_en}
+                <SpeakButton
+                  onSpeak={() => speak(m.meaning_en)}
+                  speaking={isSpeaking(m.meaning_en)}
+                  status={status}
+                  testId={`speak-meaning-${i}`}
+                  className="ml-1.5"
+                />
               </p>
             )}
           </div>
         ))}
       </div>
 
-      {/* Verb Forms */}
       {word.pos === 'verb' && word.verb_forms && (
         <div className="mb-5">
           <SectionLabel>{t('word.verbForms')}</SectionLabel>
           <div className="grid grid-cols-3 gap-3">
             {(
               [
-                ['verbInfinitive',        word.verb_forms.infinitive],
-                ['verbPast',              word.verb_forms.past],
-                ['verbPastParticiple',    word.verb_forms.past_participle],
+                ['verbInfinitive', word.verb_forms.infinitive],
+                ['verbPast', word.verb_forms.past],
+                ['verbPastParticiple', word.verb_forms.past_participle],
                 ['verbPresentParticiple', word.verb_forms.present_participle],
-                ['verbThirdPerson',       word.verb_forms.third_person],
+                ['verbThirdPerson', word.verb_forms.third_person],
               ] as [string, string][]
             ).map(([key, value]) => (
               <div key={key} className="flex flex-col gap-0.5">
@@ -109,13 +130,14 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
         </div>
       )}
 
-      {/* Explicação detalhada do primeiro significado */}
       {word.meanings[0]?.meaning && (
         <div className="mb-1">
           <SectionLabel>{t('word.tip')}</SectionLabel>
-          <p className="font-sans text-meta italic text-text-muted">
-            {word.meanings[0].meaning}
-          </p>
+          <div className="border border-accent-text/15 rounded-md bg-accent-bg/20 px-3 py-2.5">
+            <p className="font-sans text-meta italic text-text-muted">
+              {word.meanings[0].meaning}
+            </p>
+          </div>
         </div>
       )}
     </div>

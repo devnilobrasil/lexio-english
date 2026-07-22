@@ -8,6 +8,7 @@ import { useSearch } from '../hooks/useSearch'
 import { useWindowControls } from '../hooks/useWindowControls'
 import { useWords } from '../hooks/useWords'
 import { useLocale } from '../hooks/useLocale'
+import { useSpeech } from '../hooks/useSpeech'
 
 type WindowState = 'idle' | 'result'
 
@@ -18,6 +19,7 @@ export function AppShell() {
   const { savedWords, history, fetchSaved, fetchHistory, removeFromHistory, unsaveWord } = useWords()
   const { locale } = useLocale()
   const { resize } = useWindowControls()
+  const speech = useSpeech()
   const prevLocaleRef = useRef(locale)
 
   const transitionTo = useCallback((state: WindowState) => {
@@ -105,6 +107,7 @@ export function AppShell() {
           onSelectWord={handleSelectWord}
           onRemoveFromHistory={removeFromHistory}
           onUnsaveWord={unsaveWord}
+          speech={speech}
         />
       )}
 

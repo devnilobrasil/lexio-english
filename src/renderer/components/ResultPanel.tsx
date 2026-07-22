@@ -1,6 +1,7 @@
 // src/renderer/components/ResultPanel.tsx
 import React from 'react'
 import type { Word } from '../../types'
+import type { SpeechController } from '../hooks/useSpeech'
 import { Sidebar } from './Sidebar'
 import type { SidebarView } from './Sidebar'
 import { ContentArea } from './ContentArea'
@@ -18,6 +19,7 @@ interface ResultPanelProps {
   onSelectWord: (word: string) => void
   onRemoveFromHistory: (word: string) => void
   onUnsaveWord: (word: string) => void
+  speech: SpeechController
 }
 
 export function ResultPanel({
@@ -33,6 +35,7 @@ export function ResultPanel({
   onSelectWord,
   onRemoveFromHistory,
   onUnsaveWord,
+  speech,
 }: ResultPanelProps) {
   return (
     <div className="result-panel">
@@ -53,6 +56,7 @@ export function ResultPanel({
         onSelectWord={onSelectWord}
         onRemoveFromHistory={onRemoveFromHistory}
         onUnsaveWord={onUnsaveWord}
+        speech={speech}
       />
     </div>
   )
