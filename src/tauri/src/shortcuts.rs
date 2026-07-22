@@ -69,11 +69,15 @@ fn handle_assistant_hotkey(app: tauri::AppHandle) {
     let captured = selection_provider::read_selection(provider.as_ref());
     let kind = classify_selection(captured, lang_detect::is_likely_english);
 
-    let Some(win) = app.get_webview_window("assistant") else {
+    let Some(win) = app.get_webview_window("main") else {
         return;
     };
 
+    if win.is_minimized().unwrap_or(false) {
+        win.unminimize().ok();
+    }
     reposition_to_cursor_screen(&app, &win);
+    win.set_skip_taskbar(false).ok();
     win.show().ok();
     win.set_focus().ok();
 
@@ -104,8 +108,8 @@ pub fn reposition_to_cursor_screen(app: &tauri::AppHandle, win: &tauri::WebviewW
         let win_size = win
             .outer_size()
             .unwrap_or(tauri::PhysicalSize {
-                width: 560,
-                height: 200,
+                width: 720,
+                height: 110,
             });
         let x = pos.x + (size.width as i32 - win_size.width as i32) / 2;
         let y = pos.y + (size.height as i32 / 4);

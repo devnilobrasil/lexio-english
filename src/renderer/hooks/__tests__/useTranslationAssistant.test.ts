@@ -148,7 +148,7 @@ describe('useTranslationAssistant', () => {
     expect(result.current.copied).toBe(false)
   })
 
-  it('handleClose limpa copied e volta a idle', async () => {
+  it('handleClose limpa estado local sem esconder janela', async () => {
     vi.mocked(invoke).mockResolvedValue(undefined)
 
     const { result } = renderHook(() => useTranslationAssistant())
@@ -162,27 +162,16 @@ describe('useTranslationAssistant', () => {
       await result.current.handleClose()
     })
 
-    expect(invoke).toHaveBeenCalledWith('assistant_close')
+    expect(invoke).not.toHaveBeenCalledWith('assistant_close')
+    expect(invoke).not.toHaveBeenCalledWith('assistant_open_main')
     expect(result.current.state).toBe('idle')
     expect(result.current.original).toBe('')
     expect(result.current.translation).toBeNull()
     expect(result.current.copied).toBe(false)
   })
 
-  it('handleOpenMain invoca assistant_open_main e volta a idle', async () => {
-    vi.mocked(invoke).mockResolvedValue(undefined)
-
+  it('não expõe handleOpenMain', () => {
     const { result } = renderHook(() => useTranslationAssistant())
-
-    await act(async () => {
-      fireEvent('assistant:no-selection', null)
-    })
-
-    await act(async () => {
-      await result.current.handleOpenMain()
-    })
-
-    expect(invoke).toHaveBeenCalledWith('assistant_open_main')
-    expect(result.current.state).toBe('idle')
+    expect(result.current).not.toHaveProperty('handleOpenMain')
   })
 })

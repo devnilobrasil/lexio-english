@@ -15,7 +15,7 @@ function createWindow() {
   const { x: dx, y: dy } = display.workArea
 
   const win = new BrowserWindow({
-    width: 600,
+    width: 720,
     height: 60,
     x: dx + Math.round((sw - 600) / 2),
     y: dy + Math.round(sh * 0.25),

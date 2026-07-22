@@ -1,4 +1,14 @@
+// src/tauri/src/commands/window.rs
 use tauri::{AppHandle, WebviewWindow};
+
+pub fn height_for_state(state: &str) -> Option<u32> {
+    match state {
+        "idle" => Some(110),
+        "result" => Some(420),
+        "translate" => Some(320),
+        _ => None,
+    }
+}
 
 #[tauri::command]
 pub fn close_window(window: WebviewWindow) {
@@ -12,14 +22,12 @@ pub fn minimize_window(window: WebviewWindow) {
 
 #[tauri::command]
 pub fn resize_window(state: String, window: WebviewWindow) {
-    let height: u32 = match state.as_str() {
-        "idle" => 60,
-        "result" => 420,
-        _ => return,
+    let Some(height) = height_for_state(&state) else {
+        return;
     };
     window
         .set_size(tauri::Size::Physical(tauri::PhysicalSize {
-            width: 600,
+            width: 720,
             height,
         }))
         .ok();
@@ -38,29 +46,17 @@ pub fn install_update(app: AppHandle) {
 
 #[cfg(test)]
 mod tests {
+    use super::height_for_state;
+
     #[test]
     fn test_resize_state_mapping() {
-        let height_idle: u32 = match "idle" {
-            "idle" => 60,
-            "result" => 420,
-            _ => 0,
-        };
-        let height_result: u32 = match "result" {
-            "idle" => 60,
-            "result" => 420,
-            _ => 0,
-        };
-        assert_eq!(height_idle, 60);
-        assert_eq!(height_result, 420);
+        assert_eq!(height_for_state("idle"), Some(110));
+        assert_eq!(height_for_state("result"), Some(420));
+        assert_eq!(height_for_state("translate"), Some(320));
     }
 
     #[test]
     fn test_resize_invalid_state_ignored() {
-        let height: Option<u32> = match "unknown" {
-            "idle" => Some(60),
-            "result" => Some(420),
-            _ => None,
-        };
-        assert!(height.is_none());
+        assert_eq!(height_for_state("unknown"), None);
     }
 }

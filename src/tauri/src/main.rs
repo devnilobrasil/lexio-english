@@ -64,8 +64,6 @@ fn main() {
             commands::window::get_app_version,
             commands::window::install_update,
             commands::assistant::assistant_translate,
-            commands::assistant::assistant_close,
-            commands::assistant::assistant_open_main,
             commands::assistant::assistant_copy_to_clipboard,
         ])
         .run(tauri::generate_context!())

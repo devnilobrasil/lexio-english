@@ -1,10 +1,10 @@
 // src/tauri/src/commands/assistant.rs
 //
-// Lexio Assistant: translate selected text into a dedicated window.
-// Actions: translate / copy / close — no inject into the source app.
+// Translate mode: capture selection via hotkey, translate, copy to clipboard.
+// No inject into the source app; lives inside the main window.
 
 use arboard::Clipboard;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 
 use crate::ai_client;
 use crate::ai_client::config::{OLLAMA_BASE_URL_DEFAULT, OLLAMA_MODEL_DEFAULT};
@@ -135,37 +135,6 @@ pub async fn assistant_translate(
         original: original_text,
         translation,
     })
-}
-
-#[tauri::command]
-pub fn assistant_close(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("assistant") {
-        win.hide().map_err(|e| format!("Failed to hide assistant: {}", e))?;
-    }
-    Ok(())
-}
-
-/// Hides the assistant and opens the main Lexio dictionary window.
-#[tauri::command]
-pub fn assistant_open_main(app: AppHandle) -> Result<(), String> {
-    if let Some(assistant) = app.get_webview_window("assistant") {
-        assistant.hide().ok();
-    }
-
-    let Some(main) = app.get_webview_window("main") else {
-        return Err("Main window not found".to_string());
-    };
-
-    if main.is_minimized().unwrap_or(false) {
-        main.unminimize().ok();
-    }
-    crate::shortcuts::reposition_to_cursor_screen(&app, &main);
-    main.set_skip_taskbar(false).ok();
-    main.show()
-        .map_err(|e| format!("Failed to show main: {}", e))?;
-    main.set_focus()
-        .map_err(|e| format!("Failed to focus main: {}", e))?;
-    Ok(())
 }
 
 #[tauri::command]

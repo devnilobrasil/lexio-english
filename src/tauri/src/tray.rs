@@ -6,12 +6,10 @@ use tauri::{
 
 pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Show Lexio", true, None::<&str>)?;
-    let assistant_item =
-        MenuItem::with_id(app, "show_assistant", "Show Assistant", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&show_item, &assistant_item, &separator, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show_item, &separator, &quit_item])?;
 
     TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
@@ -22,17 +20,6 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                 if let Some(win) = app.get_webview_window("main") {
                     win.show().ok();
                     win.set_focus().ok();
-                }
-            }
-            "show_assistant" => {
-                if let Some(win) = app.get_webview_window("assistant") {
-                    if win.is_visible().unwrap_or(false) {
-                        win.hide().ok();
-                    } else {
-                        crate::shortcuts::reposition_to_cursor_screen(app, &win);
-                        win.show().ok();
-                        win.set_focus().ok();
-                    }
                 }
             }
             "quit" => app.exit(0),

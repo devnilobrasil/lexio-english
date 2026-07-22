@@ -15,10 +15,10 @@
       {
         "label": "main",
         "title": "Lexio",
-        "width": 600,
-        "height": 60,
-        "minWidth": 600,
-        "minHeight": 60,
+        "width": 720,
+        "height": 110,
+        "minWidth": 720,
+        "minHeight": 110,
         "resizable": false,
         "decorations": false,
         "transparent": true,
@@ -27,21 +27,6 @@
         "visible": true,
         "center": true,
         "focus": true
-      },
-      {
-        "label": "assistant",
-        "title": "Lexio Assistente",
-        "width": 560,
-        "height": 220,
-        "resizable": false,
-        "decorations": false,
-        "transparent": true,
-        "shadow": false,
-        "skipTaskbar": true,
-        "alwaysOnTop": true,
-        "visible": false,
-        "focus": true,
-        "url": "overlay.html"
       }
     ],
     "security": {
