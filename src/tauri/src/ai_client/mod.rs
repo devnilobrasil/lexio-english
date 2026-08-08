@@ -1,81 +1,582 @@
 pub mod config;
-pub mod translate_prompt;
-pub mod word_prompt;
 
-use crate::ai_client::config::{GEMINI_BASE_URL, GEMINI_MODEL, GROQ_BASE_URL, GROQ_MODEL};
-use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
-use crate::ai_client::word_prompt::{build_user_prompt, SYSTEM_PROMPT};
-use crate::types::AIWordResponse;
-use reqwest::Client;
+use crate::types::{AIWordResponse, MeaningEntry, WordExample};
+use reqwest::{Client, RequestBuilder, Url};
 use serde::Deserialize;
+use std::collections::{BTreeSet, HashMap};
 
-#[derive(Clone)]
-struct ChatMessage {
-    role: String,
-    content: String,
+const WIKIMEDIA_USER_AGENT: &str = "Lexio/1.5 (https://github.com/devnilobrasil/lexio)";
+
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictLanguage {
+    #[allow(dead_code)]
+    code: String,
+    #[allow(dead_code)]
+    name: String,
 }
 
-#[derive(Deserialize)]
-struct ChatResponse {
-    choices: Vec<Choice>,
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictPronunciation {
+    #[serde(rename = "type")]
+    r#type: String,
+    text: String,
 }
 
-#[derive(Deserialize)]
-struct Choice {
-    message: ChoiceMessage,
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictForm {
+    #[allow(dead_code)]
+    word: String,
+    #[allow(dead_code)]
+    tags: Option<Vec<String>>,
 }
 
-#[derive(Deserialize)]
-struct ChoiceMessage {
-    content: String,
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictQuote {
+    text: String,
+    reference: Option<String>,
 }
 
-/// Returns `(base_url, model)` for the given provider name.
-/// For Ollama, accepts dynamic base_url and model (user-configured).
-/// Defaults to Gemini for any unrecognised value.
-fn provider_config(provider: &str, ollama_url: &str, ollama_model: &str) -> (String, String) {
-    match provider {
-        "groq" => (GROQ_BASE_URL.to_string(), GROQ_MODEL.to_string()),
-        "ollama" => (ollama_url.to_string(), ollama_model.to_string()),
-        _ => (GEMINI_BASE_URL.to_string(), GEMINI_MODEL.to_string()),
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictSense {
+    definition: String,
+    tags: Option<Vec<String>>,
+    examples: Option<Vec<String>>,
+    quotes: Option<Vec<FreeDictQuote>>,
+    synonyms: Option<Vec<String>>,
+    antonyms: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictEntry {
+    #[allow(dead_code)]
+    language: Option<FreeDictLanguage>,
+    #[serde(rename = "partOfSpeech")]
+    part_of_speech: String,
+    pronunciations: Option<Vec<FreeDictPronunciation>>,
+    #[allow(dead_code)]
+    forms: Option<Vec<FreeDictForm>>,
+    senses: Option<Vec<FreeDictSense>>,
+    synonyms: Option<Vec<String>>,
+    antonyms: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct FreeDictResponse {
+    word: String,
+    entries: Vec<FreeDictEntry>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct WiktionaryDefinition {
+    definition: Option<String>,
+    examples: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct WiktionaryEntry {
+    #[serde(rename = "partOfSpeech")]
+    part_of_speech: String,
+    definitions: Vec<WiktionaryDefinition>,
+}
+
+#[derive(Debug, Clone)]
+struct FreeDictMetadata {
+    phonetic: Option<String>,
+    synonyms: Vec<String>,
+    antonyms: Vec<String>,
+}
+
+fn clean_html(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut in_tag = false;
+    let mut pending_space = false;
+
+    for ch in input.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => {
+                if in_tag {
+                    in_tag = false;
+                    pending_space = true;
+                }
+            }
+            _ if !in_tag => {
+                if pending_space && !out.is_empty() && !out.ends_with(char::is_whitespace) {
+                    out.push(' ');
+                }
+                pending_space = false;
+                out.push(ch);
+            }
+            _ => {}
+        }
     }
+
+    out = out
+        .replace("&nbsp;", " ")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&");
+
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Low-level HTTP call to any OpenAI-compatible endpoint.
-/// Returns the raw `content` string from `choices[0].message.content`.
-/// `json_mode`: when true, adds `response_format: { type: "json_object" }`.
-/// `disable_thinking`: when true, adds `think: false` (for Ollama reasoning models).
-async fn call_provider(
-    client: &Client,
-    base_url: &str,
-    model: &str,
-    api_key: &str,
-    messages: Vec<ChatMessage>,
-    json_mode: bool,
-    disable_thinking: bool,
-) -> Result<String, String> {
-    let msgs: Vec<serde_json::Value> = messages
+fn normalize_for_dedupe(input: &str) -> String {
+    input
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn push_unique_example(
+    examples: &mut Vec<WordExample>,
+    seen_example_indexes: &mut HashMap<String, usize>,
+    raw_text: &str,
+    translation: String,
+) {
+    let cleaned = clean_html(raw_text);
+    if cleaned.is_empty() {
+        return;
+    }
+
+    let key = normalize_for_dedupe(&cleaned);
+    if let Some(existing_index) = seen_example_indexes.get(&key) {
+        if examples[*existing_index].translation.is_empty() && !translation.is_empty() {
+            examples[*existing_index].translation = translation;
+        }
+        return;
+    }
+
+    seen_example_indexes.insert(key, examples.len());
+    examples.push(WordExample {
+        en: cleaned,
+        translation,
+    });
+}
+
+fn merge_unique_examples(existing: &mut Vec<WordExample>, incoming: Vec<WordExample>) {
+    let mut seen_example_indexes = existing
         .iter()
-        .map(|m| serde_json::json!({ "role": m.role, "content": m.content }))
-        .collect();
+        .enumerate()
+        .map(|(index, example)| (normalize_for_dedupe(&example.en), index))
+        .collect::<HashMap<_, _>>();
 
-    let mut body = serde_json::json!({ "model": model, "messages": msgs });
+    for example in incoming {
+        let key = normalize_for_dedupe(&example.en);
+        if let Some(existing_index) = seen_example_indexes.get(&key) {
+            if existing[*existing_index].translation.is_empty() && !example.translation.is_empty() {
+                existing[*existing_index].translation = example.translation;
+            }
+            continue;
+        }
 
-    if json_mode {
-        body["response_format"] = serde_json::json!({ "type": "json_object" });
+        seen_example_indexes.insert(key, existing.len());
+        existing.push(WordExample {
+            en: example.en,
+            translation: example.translation,
+        });
     }
-    if disable_thinking {
-        body["think"] = serde_json::json!(false);
+}
+
+fn map_wiktionary_to_ai_word(
+    word: &str,
+    response: HashMap<String, Vec<WiktionaryEntry>>,
+) -> Result<AIWordResponse, String> {
+    let en_entries = response
+        .get("en")
+        .ok_or_else(|| "Wiktionary response does not contain 'en' definitions".to_string())?;
+
+    let mut pos_set = BTreeSet::new();
+    let mut contexts_set = BTreeSet::new();
+    let mut meanings: Vec<MeaningEntry> = Vec::new();
+    let mut meaning_indexes: HashMap<(String, String), usize> = HashMap::new();
+
+    for entry in en_entries {
+        if entry.part_of_speech.trim().is_empty() {
+            continue;
+        }
+
+        pos_set.insert(entry.part_of_speech.clone());
+        contexts_set.insert(entry.part_of_speech.clone());
+
+        for definition in &entry.definitions {
+            let Some(raw_definition) = definition.definition.as_ref() else {
+                continue;
+            };
+
+            let cleaned_definition = clean_html(raw_definition);
+            if cleaned_definition.is_empty() {
+                continue;
+            }
+
+            let mut examples = Vec::new();
+            let mut seen_example_indexes = HashMap::new();
+            if let Some(example_list) = definition.examples.as_ref() {
+                for example in example_list {
+                    push_unique_example(
+                        &mut examples,
+                        &mut seen_example_indexes,
+                        example,
+                        String::new(),
+                    );
+                }
+            }
+
+            let meaning_key = (
+                normalize_for_dedupe(&entry.part_of_speech),
+                normalize_for_dedupe(&cleaned_definition),
+            );
+            if let Some(existing_index) = meaning_indexes.get(&meaning_key) {
+                merge_unique_examples(&mut meanings[*existing_index].examples, examples);
+                continue;
+            }
+            meaning_indexes.insert(meaning_key, meanings.len());
+
+            meanings.push(MeaningEntry {
+                context: entry.part_of_speech.clone(),
+                meaning_en: cleaned_definition.clone(),
+                meaning_short: cleaned_definition.clone(),
+                meaning: cleaned_definition,
+                examples,
+            });
+        }
     }
 
-    let mut request = client.post(base_url);
-
-    // Only add Authorization header if api_key is not empty (Ollama doesn't need it)
-    if !api_key.is_empty() {
-        request = request.header("Authorization", format!("Bearer {}", api_key));
+    if meanings.is_empty() {
+        return Err("Wiktionary response contains no usable definitions".to_string());
     }
 
-    let response = request
+    let pos = if pos_set.is_empty() {
+        None
+    } else {
+        Some(pos_set.into_iter().collect::<Vec<_>>().join(", "))
+    };
+
+    Ok(AIWordResponse {
+        word: word.to_string(),
+        phonetic: None,
+        pos,
+        level: None,
+        verb_forms: None,
+        meanings,
+        synonyms: Vec::new(),
+        antonyms: Vec::new(),
+        contexts: contexts_set.into_iter().collect(),
+    })
+}
+
+fn map_freedict_to_ai_word(response: FreeDictResponse) -> Result<AIWordResponse, String> {
+    if response.entries.is_empty() {
+        return Err("Free Dictionary response has no entries".to_string());
+    }
+
+    let mut phonetic = None;
+    for entry in &response.entries {
+        if let Some(ref prons) = entry.pronunciations {
+            for pron in prons {
+                if pron.r#type == "ipa" {
+                    phonetic = Some(pron.text.clone());
+                    break;
+                }
+            }
+        }
+        if phonetic.is_some() {
+            break;
+        }
+    }
+
+    let mut pos_set = BTreeSet::new();
+    for entry in &response.entries {
+        pos_set.insert(entry.part_of_speech.clone());
+    }
+    let pos = if pos_set.is_empty() {
+        None
+    } else {
+        Some(pos_set.into_iter().collect::<Vec<_>>().join(", "))
+    };
+
+    let mut meanings: Vec<MeaningEntry> = Vec::new();
+    let mut meaning_indexes: HashMap<(String, String), usize> = HashMap::new();
+    let mut synonyms_set = BTreeSet::new();
+    let mut antonyms_set = BTreeSet::new();
+    let mut contexts_set = BTreeSet::new();
+
+    for entry in &response.entries {
+        contexts_set.insert(entry.part_of_speech.clone());
+        if let Some(ref syns) = entry.synonyms {
+            for s in syns {
+                synonyms_set.insert(s.clone());
+            }
+        }
+        if let Some(ref ants) = entry.antonyms {
+            for a in ants {
+                antonyms_set.insert(a.clone());
+            }
+        }
+
+        if let Some(ref senses) = entry.senses {
+            for sense in senses {
+                let cleaned_definition = clean_html(&sense.definition);
+                if cleaned_definition.is_empty() {
+                    continue;
+                }
+
+                let mut word_examples = Vec::new();
+                let mut seen_example_indexes = HashMap::new();
+                if let Some(ref examples) = sense.examples {
+                    for ex in examples {
+                        push_unique_example(
+                            &mut word_examples,
+                            &mut seen_example_indexes,
+                            ex,
+                            String::new(),
+                        );
+                    }
+                }
+                // Caso nao haja examples, coloque a chave quotes - text
+                if word_examples.is_empty() {
+                    if let Some(ref quotes) = sense.quotes {
+                        for q in quotes {
+                            push_unique_example(
+                                &mut word_examples,
+                                &mut seen_example_indexes,
+                                &q.text,
+                                q.reference.clone().unwrap_or_default(),
+                            );
+                        }
+                    }
+                }
+
+                let mut context = entry.part_of_speech.clone();
+                if let Some(ref tags) = sense.tags {
+                    for t in tags {
+                        contexts_set.insert(t.clone());
+                    }
+                    if !tags.is_empty() {
+                        context = format!("{} ({})", context, tags.join(", "));
+                    }
+                }
+
+                if let Some(ref syns) = sense.synonyms {
+                    for s in syns {
+                        synonyms_set.insert(s.clone());
+                    }
+                }
+                if let Some(ref ants) = sense.antonyms {
+                    for a in ants {
+                        antonyms_set.insert(a.clone());
+                    }
+                }
+
+                let meaning_key = (
+                    normalize_for_dedupe(&context),
+                    normalize_for_dedupe(&cleaned_definition),
+                );
+                if let Some(existing_index) = meaning_indexes.get(&meaning_key) {
+                    merge_unique_examples(&mut meanings[*existing_index].examples, word_examples);
+                    continue;
+                }
+                meaning_indexes.insert(meaning_key, meanings.len());
+
+                meanings.push(MeaningEntry {
+                    context,
+                    meaning_en: cleaned_definition.clone(),
+                    meaning_short: cleaned_definition.clone(),
+                    meaning: cleaned_definition,
+                    examples: word_examples,
+                });
+            }
+        }
+    }
+
+    if meanings.is_empty() {
+        return Err("Free Dictionary response has no usable meanings".to_string());
+    }
+
+    Ok(AIWordResponse {
+        word: response.word,
+        phonetic,
+        pos,
+        level: None,
+        verb_forms: None,
+        meanings,
+        synonyms: synonyms_set.into_iter().collect(),
+        antonyms: antonyms_set.into_iter().collect(),
+        contexts: contexts_set.into_iter().collect(),
+    })
+}
+
+fn map_freedict_metadata(response: &FreeDictResponse) -> FreeDictMetadata {
+    let mut phonetic = None;
+    let mut synonyms = BTreeSet::new();
+    let mut antonyms = BTreeSet::new();
+
+    for entry in &response.entries {
+        if phonetic.is_none() {
+            if let Some(ref prons) = entry.pronunciations {
+                for pron in prons {
+                    if pron.r#type == "ipa" {
+                        phonetic = Some(pron.text.clone());
+                        break;
+                    }
+                }
+            }
+        }
+
+        if let Some(ref syns) = entry.synonyms {
+            for syn in syns {
+                synonyms.insert(syn.clone());
+            }
+        }
+
+        if let Some(ref ants) = entry.antonyms {
+            for ant in ants {
+                antonyms.insert(ant.clone());
+            }
+        }
+
+        if let Some(ref senses) = entry.senses {
+            for sense in senses {
+                if let Some(ref syns) = sense.synonyms {
+                    for syn in syns {
+                        synonyms.insert(syn.clone());
+                    }
+                }
+
+                if let Some(ref ants) = sense.antonyms {
+                    for ant in ants {
+                        antonyms.insert(ant.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    FreeDictMetadata {
+        phonetic,
+        synonyms: synonyms.into_iter().collect(),
+        antonyms: antonyms.into_iter().collect(),
+    }
+}
+
+fn merge_wiktionary_with_freedict_metadata(
+    mut wiktionary_word: AIWordResponse,
+    metadata: FreeDictMetadata,
+) -> AIWordResponse {
+    wiktionary_word.phonetic = metadata.phonetic;
+    wiktionary_word.synonyms = metadata.synonyms;
+    wiktionary_word.antonyms = metadata.antonyms;
+    wiktionary_word
+}
+
+async fn fetch_wiktionary_word(client: &Client, word: &str) -> Result<AIWordResponse, String> {
+    let base_url = config::wiktionary_word_api_url();
+    let mut url = Url::parse(&base_url)
+        .map_err(|e| format!("Invalid Wiktionary base URL '{}': {}", base_url, e))?;
+    url.path_segments_mut()
+        .map_err(|_| "Wiktionary base URL cannot be used for path segments".to_string())?
+        .push(word);
+
+    let response = client
+        .get(url)
+        .header(reqwest::header::USER_AGENT, WIKIMEDIA_USER_AGENT)
+        .send()
+        .await
+        .map_err(|e| format!("Wiktionary HTTP error: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Wiktionary API error {}: {}", status, body));
+    }
+
+    let parsed = response
+        .json::<HashMap<String, Vec<WiktionaryEntry>>>()
+        .await
+        .map_err(|e| format!("Failed to parse Wiktionary response JSON: {}", e))?;
+
+    map_wiktionary_to_ai_word(word, parsed)
+}
+
+async fn fetch_freedict_word(client: &Client, word: &str) -> Result<FreeDictResponse, String> {
+    let base_url = config::freedict_word_api_url();
+    let mut url = Url::parse(&base_url)
+        .map_err(|e| format!("Invalid Free Dictionary base URL '{}': {}", base_url, e))?;
+    url.path_segments_mut()
+        .map_err(|_| "Free Dictionary base URL cannot be used for path segments".to_string())?
+        .extend(["entries", "en", word]);
+    {
+        let mut query_pairs = url.query_pairs_mut();
+        query_pairs.append_pair("translations", "false");
+        query_pairs.append_pair("pretty", "true");
+    }
+
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Free Dictionary HTTP error: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Free Dictionary API error {}: {}", status, body));
+    }
+
+    response
+        .json::<FreeDictResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse Free Dictionary API response JSON: {}", e))
+}
+
+#[derive(Deserialize)]
+struct TranslationApiResponse {
+    translation: Option<String>,
+}
+
+fn with_api_key(request: RequestBuilder, api_key: Option<&str>) -> RequestBuilder {
+    match api_key.map(str::trim).filter(|key| !key.is_empty()) {
+        Some(key) => request.bearer_auth(key),
+        None => request,
+    }
+}
+
+/// Fetches word data from Wiktionary with Free Dictionary fallback/enrichment.
+pub async fn fetch_word(
+    client: &Client,
+    word: &str,
+    _locale: &str,
+) -> Result<AIWordResponse, String> {
+    let (wiktionary_result, freedict_result) = tokio::join!(
+        fetch_wiktionary_word(client, word),
+        fetch_freedict_word(client, word)
+    );
+
+    match (wiktionary_result, freedict_result) {
+        (Ok(wiktionary_word), Ok(freedict_response)) => Ok(merge_wiktionary_with_freedict_metadata(
+            wiktionary_word,
+            map_freedict_metadata(&freedict_response),
+        )),
+        (Ok(wiktionary_word), Err(_)) => Ok(wiktionary_word),
+        (Err(_), Ok(freedict_response)) => map_freedict_to_ai_word(freedict_response),
+        (Err(wiktionary_err), Err(freedict_err)) => Err(format!(
+            "Word lookup failed. Wiktionary: {} | Free Dictionary: {}",
+            wiktionary_err, freedict_err
+        )),
+    }
+}
+
+/// Translates `text` using the Lexio API v2 translation endpoint.
+pub async fn fetch_translation(
+    client: &Client,
+    api_key: Option<&str>,
+    text: &str,
+) -> Result<String, String> {
+    let url = config::translate_api_url();
+    let body = serde_json::json!({ "text": text });
+    let response = with_api_key(client.post(&url), api_key)
         .json(&body)
         .send()
         .await
@@ -84,294 +585,517 @@ async fn call_provider(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(format!("AI provider error {}: {}", status, body));
+        return Err(format!("API v2 translation error {}: {}", status, body));
     }
 
-    let chat: ChatResponse = response
-        .json()
+    let text_resp = response
+        .text()
         .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
 
-    chat.choices
-        .first()
-        .map(|c| c.message.content.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "Empty response from AI provider".to_string())
-}
-
-/// Fetches word data from the selected AI provider.
-///
-/// `provider`: "gemini" | "groq" | "ollama" — determines which endpoint and model to use.
-/// `api_key`: the key for the selected provider. Returns an error if empty (except for ollama).
-/// `ollama_url`: base URL for Ollama (ignored for other providers).
-/// `ollama_model`: model name for Ollama (ignored for other providers).
-pub async fn fetch_word(
-    client: &Client,
-    provider: &str,
-    api_key: &str,
-    word: &str,
-    locale: &str,
-    ollama_url: &str,
-    ollama_model: &str,
-) -> Result<AIWordResponse, String> {
-    // Ollama doesn't need an API key, but other providers do
-    if provider != "ollama" && api_key.is_empty() {
-        return Err(format!(
-            "Chave {} não configurada. Acesse Configurações.",
-            provider
-        ));
+    if let Ok(parsed) = serde_json::from_str::<TranslationApiResponse>(&text_resp) {
+        if let Some(t) = parsed.translation {
+            return Ok(t.trim().to_string());
+        }
     }
 
-    let messages = vec![
-        ChatMessage {
-            role: "system".to_string(),
-            content: SYSTEM_PROMPT.to_string(),
-        },
-        ChatMessage {
-            role: "user".to_string(),
-            content: build_user_prompt(word, locale),
-        },
-    ];
-
-    let (base_url, model) = provider_config(provider, ollama_url, ollama_model);
-    let is_ollama = provider == "ollama";
-    // Ollama models don't support response_format: json_object; disable thinking for reasoning models
-    let content = call_provider(client, &base_url, &model, api_key, messages, !is_ollama, is_ollama).await?;
-    serde_json::from_str::<AIWordResponse>(&content)
-        .map_err(|e| format!("Failed to parse AI response JSON: {}", e))
-}
-
-/// Translates `text` to English using the selected AI provider.
-/// Returns plain text (no JSON wrapping).
-///
-/// `provider`: "gemini" | "groq" | "ollama".
-/// `api_key`: the key for the selected provider. Returns an error if empty (except for ollama).
-/// `ollama_url`: base URL for Ollama (ignored for other providers).
-/// `ollama_model`: model name for Ollama (ignored for other providers).
-pub async fn fetch_translation(
-    client: &Client,
-    provider: &str,
-    api_key: &str,
-    text: &str,
-    ollama_url: &str,
-    ollama_model: &str,
-) -> Result<String, String> {
-    // Ollama doesn't need an API key, but other providers do
-    if provider != "ollama" && api_key.is_empty() {
-        return Err(format!(
-            "Chave {} não configurada. Acesse Configurações.",
-            provider
-        ));
-    }
-
-    let messages = vec![
-        ChatMessage {
-            role: "system".to_string(),
-            content: TRANSLATE_SYSTEM_PROMPT.to_string(),
-        },
-        ChatMessage {
-            role: "user".to_string(),
-            content: text.to_string(),
-        },
-    ];
-
-    let (base_url, model) = provider_config(provider, ollama_url, ollama_model);
-    let is_ollama = provider == "ollama";
-    call_provider(client, &base_url, &model, api_key, messages, false, is_ollama).await
+    Ok(text_resp.trim().to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_client::word_prompt::{build_user_prompt, locale_name};
-
-    // --- provider_config ---
+    use std::collections::HashMap;
 
     #[test]
-    fn provider_config_groq_returns_groq_constants() {
-        let (url, model) = provider_config("groq", "", "");
-        assert_eq!(url, GROQ_BASE_URL.to_string());
-        assert_eq!(model, GROQ_MODEL.to_string());
+    fn translation_request_uses_stored_api_key_as_bearer_token() {
+        let request = with_api_key(
+            Client::new().post("https://api.lexio.app/v2/translate"),
+            Some("  stored-key  "),
+        )
+        .build()
+        .unwrap();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(reqwest::header::AUTHORIZATION)
+                .unwrap(),
+            "Bearer stored-key"
+        );
     }
 
     #[test]
-    fn provider_config_gemini_returns_gemini_constants() {
-        let (url, model) = provider_config("gemini", "", "");
-        assert_eq!(url, GEMINI_BASE_URL.to_string());
-        assert_eq!(model, GEMINI_MODEL.to_string());
+    fn translation_request_omits_auth_header_without_api_key() {
+        let request = with_api_key(
+            Client::new().post("https://api.lexio.app/v2/translate"),
+            None,
+        )
+        .build()
+        .unwrap();
+
+        assert!(request
+            .headers()
+            .get(reqwest::header::AUTHORIZATION)
+            .is_none());
     }
 
     #[test]
-    fn provider_config_ollama_returns_user_url_and_model() {
-        let custom_url = "http://192.168.1.100:11434/v1/chat/completions";
-        let custom_model = "llama3";
-        let (url, model) = provider_config("ollama", custom_url, custom_model);
-        assert_eq!(url, custom_url.to_string());
-        assert_eq!(model, custom_model.to_string());
-    }
-
-    #[test]
-    fn provider_config_unknown_defaults_to_gemini() {
-        let (url, model) = provider_config("openai", "", "");
-        assert_eq!(url, GEMINI_BASE_URL.to_string());
-        assert_eq!(model, GEMINI_MODEL.to_string());
-    }
-
-    // --- empty key guard ---
-
-    #[test]
-    fn fetch_word_rejects_empty_api_key() {
-        // Validate that an empty key is rejected before any HTTP call is made.
-        // We mirror the guard logic directly since we can't call the async fn in a sync test.
-        let api_key = "";
-        let provider = "gemini";
-        let result: Result<(), String> = if api_key.is_empty() {
-            Err(format!(
-                "Chave {} não configurada. Acesse Configurações.",
-                provider
-            ))
-        } else {
-            Ok(())
-        };
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("gemini"));
-    }
-
-    #[test]
-    fn fetch_translation_rejects_empty_api_key() {
-        let api_key = "";
-        let provider = "groq";
-        let result: Result<(), String> = if api_key.is_empty() {
-            Err(format!(
-                "Chave {} não configurada. Acesse Configurações.",
-                provider
-            ))
-        } else {
-            Ok(())
-        };
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("groq"));
-    }
-
-    // --- locale / prompt ---
-
-    #[test]
-    fn test_locale_name_pt_br() {
-        assert_eq!(locale_name("pt-BR"), "Brazilian Portuguese");
-    }
-
-    #[test]
-    fn test_locale_name_es() {
-        assert_eq!(locale_name("es"), "Spanish");
-    }
-
-    #[test]
-    fn test_locale_name_unknown_falls_back_to_english() {
-        assert_eq!(locale_name("fr"), "English");
-    }
-
-    #[test]
-    fn test_build_user_prompt_contains_word() {
-        let prompt = build_user_prompt("churn", "pt-BR");
-        assert!(prompt.contains("churn"));
-        assert!(prompt.contains("Brazilian Portuguese"));
-    }
-
-    #[test]
-    fn test_build_user_prompt_es_contains_spanish() {
-        let prompt = build_user_prompt("run", "es");
-        assert!(prompt.contains("Spanish"));
-    }
-
-    #[test]
-    fn test_parse_ai_response_valid_json() {
-        let json = r#"{
-            "word": "churn",
-            "phonetic": "/tʃɜːrn/",
-            "pos": "verb",
-            "level": "Advanced",
-            "verb_forms": null,
-            "meanings": [],
-            "synonyms": ["agitate"],
-            "antonyms": [],
-            "contexts": ["Business"]
-        }"#;
-        let result: Result<crate::types::AIWordResponse, _> = serde_json::from_str(json);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().word, "churn");
-    }
-
-    #[test]
-    fn test_parse_ai_response_invalid_json_errors() {
-        let bad_json = r#"not valid json"#;
-        let result: Result<crate::types::AIWordResponse, _> = serde_json::from_str(bad_json);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_translate_prompt_is_non_empty() {
-        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
-        assert!(!TRANSLATE_SYSTEM_PROMPT.is_empty());
-    }
-
-    #[test]
-    fn test_translate_prompt_targets_english() {
-        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
-        assert!(TRANSLATE_SYSTEM_PROMPT.to_lowercase().contains("english"));
-    }
-
-    #[test]
-    fn test_translate_prompt_forbids_explanations() {
-        use crate::ai_client::translate_prompt::TRANSLATE_SYSTEM_PROMPT;
-        assert!(TRANSLATE_SYSTEM_PROMPT.to_lowercase().contains("only"));
-    }
-
-    #[test]
-    fn test_parse_translation_response_extracts_content() {
-        let json = r#"{
-            "choices": [
-                { "message": { "content": "The cat sat on the mat." } }
-            ]
-        }"#;
-        let parsed: Result<super::ChatResponse, _> = serde_json::from_str(json);
+    fn test_parse_translation_response_json() {
+        let json = r#"{ "translation": "The cat sat on the mat." }"#;
+        let parsed: Result<TranslationApiResponse, _> = serde_json::from_str(json);
         assert!(parsed.is_ok());
-        let chat = parsed.unwrap();
-        assert_eq!(chat.choices[0].message.content, "The cat sat on the mat.");
+        assert_eq!(parsed.unwrap().translation.unwrap(), "The cat sat on the mat.");
     }
 
     #[test]
-    fn test_parse_ai_response_with_full_meanings() {
+    fn test_map_freedict_to_ai_word_from_example() {
         let json = r#"{
-            "word": "churn",
-            "phonetic": "/tʃɜːrn/",
-            "pos": "verb",
-            "level": "Advanced",
-            "verb_forms": {
-                "infinitive": "to churn",
-                "past": "churned",
-                "past_participle": "churned",
-                "present_participle": "churning",
-                "third_person": "churns"
-            },
-            "meanings": [
+          "word": "explanation",
+          "entries": [
+            {
+              "language": {
+                "code": "en",
+                "name": "English"
+              },
+              "partOfSpeech": "noun",
+              "pronunciations": [
                 {
-                    "context": "Business",
-                    "meaning_en": "To produce in large quantities.",
-                    "meaning_short": "Produzir em grandes quantidades.",
-                    "meaning": "Quando algo é produzido em massa.",
-                    "examples": [
-                        { "en": "The factory churns out cars.", "translation": "A fábrica produz carros." }
-                    ]
+                  "type": "ipa",
+                  "text": "/ˌɛkspləˈneɪʃən/",
+                  "tags": []
                 }
-            ],
-            "synonyms": ["agitate", "stir"],
-            "antonyms": ["calm"],
-            "contexts": ["Business"]
+              ],
+              "forms": [
+                {
+                  "word": "explanations",
+                  "tags": ["plural"]
+                }
+              ],
+              "senses": [
+                {
+                  "definition": "The act or process of explaining.",
+                  "tags": ["countable", "uncountable"],
+                  "examples": [
+                    "The explanation was long and drawn-out."
+                  ],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": [],
+                  "subsenses": []
+                },
+                {
+                  "definition": "Something that explains or makes understandable.",
+                  "tags": ["countable"],
+                  "examples": [],
+                  "quotes": [
+                    {
+                      "text": "The socialist will, of course...",
+                      "reference": "1949, F. A. Hayek..."
+                    }
+                  ],
+                  "synonyms": [],
+                  "antonyms": [],
+                  "subsenses": []
+                }
+              ],
+              "synonyms": [
+                "clarification",
+                "elucidation"
+              ],
+              "antonyms": []
+            }
+          ]
         }"#;
-        let result: crate::types::AIWordResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(result.meanings.len(), 1);
-        assert_eq!(result.meanings[0].context, "Business");
-        assert_eq!(result.meanings[0].examples.len(), 1);
-        assert!(result.verb_forms.is_some());
+
+        let parsed: FreeDictResponse = serde_json::from_str(json).unwrap();
+        let mapped = map_freedict_to_ai_word(parsed).unwrap();
+
+        assert_eq!(mapped.word, "explanation");
+        assert_eq!(mapped.phonetic.unwrap(), "/ˌɛkspləˈneɪʃən/");
+        assert_eq!(mapped.pos.unwrap(), "noun");
+
+        // Count senses/meanings
+        assert_eq!(mapped.meanings.len(), 2);
+
+        // Check sense 1 (with example)
+        let m1 = &mapped.meanings[0];
+        assert_eq!(m1.context, "noun (countable, uncountable)");
+        assert_eq!(m1.meaning_en, "The act or process of explaining.");
+        assert_eq!(m1.examples.len(), 1);
+        assert_eq!(m1.examples[0].en, "The explanation was long and drawn-out.");
+        assert_eq!(m1.examples[0].translation, "");
+
+        // Check sense 2 (no example, should fall back to quotes)
+        let m2 = &mapped.meanings[1];
+        assert_eq!(m2.context, "noun (countable)");
+        assert_eq!(m2.examples.len(), 1);
+        assert_eq!(m2.examples[0].en, "The socialist will, of course...");
+        assert_eq!(m2.examples[0].translation, "1949, F. A. Hayek...");
+
+        // Check synonyms
+        assert!(mapped.synonyms.contains(&"clarification".to_string()));
+        assert!(mapped.synonyms.contains(&"elucidation".to_string()));
+    }
+
+    #[test]
+    fn test_clean_html_removes_tags_and_nbsp() {
+        let raw = "<b>cat</b>&nbsp;<i>animal</i>";
+        assert_eq!(clean_html(raw), "cat animal");
+    }
+
+    #[test]
+    fn test_clean_html_keeps_word_boundary_between_adjacent_tags() {
+        let raw = "<b>A</b><i>trial</i>";
+        assert_eq!(clean_html(raw), "A trial");
+    }
+
+    #[test]
+    fn test_clean_html_decodes_common_entities() {
+        let raw = "&nbsp;A&amp;B &quot;quoted&quot; &#39;single&#39; &lt;tag&gt;&nbsp;";
+        assert_eq!(clean_html(raw), "A&B \"quoted\" 'single' <tag>");
+    }
+
+    #[test]
+    fn test_push_unique_example_dedupes_after_cleaning_html() {
+        let mut examples = Vec::new();
+        let mut seen = HashMap::new();
+
+        push_unique_example(&mut examples, &mut seen, "<b>A</b><i>trial</i>", String::new());
+        push_unique_example(&mut examples, &mut seen, "A trial", String::new());
+
+        assert_eq!(examples.len(), 1);
+        assert_eq!(examples[0].en, "A trial");
+    }
+
+    #[test]
+    fn test_map_wiktionary_to_ai_word_from_example() {
+        let json = r#"{
+          "en": [
+            {
+              "partOfSpeech": "noun",
+              "definitions": [
+                {
+                  "definition": "<b>A domesticated</b>&nbsp;feline mammal.",
+                  "examples": ["<i>The</i> cat sleeps."]
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: HashMap<String, Vec<WiktionaryEntry>> = serde_json::from_str(json).unwrap();
+        let mapped = map_wiktionary_to_ai_word("cat", parsed).unwrap();
+
+        assert_eq!(mapped.word, "cat");
+        assert_eq!(mapped.pos, Some("noun".to_string()));
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].meaning_en, "A domesticated feline mammal.");
+        assert_eq!(mapped.meanings[0].examples[0].en, "The cat sleeps.");
+    }
+
+    #[test]
+    fn test_map_wiktionary_deduplicates_meanings_and_examples() {
+        let json = r#"{
+          "en": [
+            {
+              "partOfSpeech": "noun",
+              "definitions": [
+                {
+                  "definition": "A domesticated feline mammal.",
+                  "examples": ["The cat sleeps.", " The cat   sleeps. "]
+                },
+                {
+                  "definition": "  A domesticated feline mammal.  ",
+                  "examples": ["  The cat sleeps. "]
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: HashMap<String, Vec<WiktionaryEntry>> = serde_json::from_str(json).unwrap();
+        let mapped = map_wiktionary_to_ai_word("cat", parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].examples.len(), 1);
+        assert_eq!(mapped.meanings[0].examples[0].en, "The cat sleeps.");
+    }
+
+    #[test]
+    fn test_merge_wiktionary_meanings_with_freedict_metadata() {
+        let wiki = AIWordResponse {
+            word: "cat".to_string(),
+            phonetic: None,
+            pos: Some("noun".to_string()),
+            level: None,
+            verb_forms: None,
+            meanings: vec![crate::types::MeaningEntry {
+                context: "noun".to_string(),
+                meaning_en: "A feline mammal.".to_string(),
+                meaning_short: "A feline mammal.".to_string(),
+                meaning: "A feline mammal.".to_string(),
+                examples: vec![],
+            }],
+            synonyms: vec![],
+            antonyms: vec![],
+            contexts: vec!["noun".to_string()],
+        };
+
+        let merged = merge_wiktionary_with_freedict_metadata(
+            wiki,
+            FreeDictMetadata {
+                phonetic: Some("/kæt/".to_string()),
+                synonyms: vec!["kitty".to_string()],
+                antonyms: vec!["dog".to_string()],
+            },
+        );
+
+        assert_eq!(merged.phonetic, Some("/kæt/".to_string()));
+        assert_eq!(merged.synonyms, vec!["kitty".to_string()]);
+        assert_eq!(merged.antonyms, vec!["dog".to_string()]);
+        assert_eq!(merged.meanings[0].meaning, "A feline mammal.");
+    }
+
+    #[test]
+    fn test_map_freedict_to_ai_word_rejects_empty_entries() {
+        let parsed: FreeDictResponse = serde_json::from_str(r#"{ "word": "cat", "entries": [] }"#).unwrap();
+        let result = map_freedict_to_ai_word(parsed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_map_freedict_deduplicates_meanings_and_examples() {
+        let json = r#"{
+          "word": "test",
+          "entries": [
+            {
+              "partOfSpeech": "noun",
+              "senses": [
+                {
+                  "definition": "A trial.",
+                  "tags": [],
+                  "examples": ["This is a test.", " This   is a test. "],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": []
+                },
+                {
+                  "definition": "  A trial. ",
+                  "tags": [],
+                  "examples": [" This is a test. "],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": []
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: FreeDictResponse = serde_json::from_str(json).unwrap();
+        let mapped = map_freedict_to_ai_word(parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].examples.len(), 1);
+        assert_eq!(mapped.meanings[0].examples[0].en, "This is a test.");
+    }
+
+    #[test]
+    fn test_map_wiktionary_merges_examples_for_duplicate_meaning() {
+        let json = r#"{
+          "en": [
+            {
+              "partOfSpeech": "noun",
+              "definitions": [
+                {
+                  "definition": "A domesticated feline mammal.",
+                  "examples": []
+                },
+                {
+                  "definition": " A domesticated feline mammal. ",
+                  "examples": ["The cat sleeps."]
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: HashMap<String, Vec<WiktionaryEntry>> = serde_json::from_str(json).unwrap();
+        let mapped = map_wiktionary_to_ai_word("cat", parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].examples.len(), 1);
+        assert_eq!(mapped.meanings[0].examples[0].en, "The cat sleeps.");
+    }
+
+    #[test]
+    fn test_map_freedict_cleans_and_dedupes_duplicate_examples() {
+        let json = r#"{
+          "word": "test",
+          "entries": [
+            {
+              "partOfSpeech": "noun",
+              "senses": [
+                {
+                  "definition": "A trial.",
+                  "tags": [],
+                  "examples": ["<b>  This   is&nbsp;a test. </b>", "This is a test."],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": []
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: FreeDictResponse = serde_json::from_str(json).unwrap();
+        let mapped = map_freedict_to_ai_word(parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].examples.len(), 1);
+        assert_eq!(mapped.meanings[0].examples[0].en, "This is a test.");
+    }
+
+    #[test]
+    fn test_map_wiktionary_preserves_order_while_merging_examples() {
+        let json = r#"{
+          "en": [
+            {
+              "partOfSpeech": "noun",
+              "definitions": [
+                {
+                  "definition": "First meaning.",
+                  "examples": ["First example."]
+                },
+                {
+                  "definition": "Second meaning.",
+                  "examples": ["Second meaning example."]
+                },
+                {
+                  "definition": " First meaning. ",
+                  "examples": ["Second example for first meaning."]
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: HashMap<String, Vec<WiktionaryEntry>> = serde_json::from_str(json).unwrap();
+        let mapped = map_wiktionary_to_ai_word("test", parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 2);
+        assert_eq!(mapped.meanings[0].meaning_en, "First meaning.");
+        assert_eq!(mapped.meanings[1].meaning_en, "Second meaning.");
+        assert_eq!(mapped.meanings[0].examples.len(), 2);
+        assert_eq!(mapped.meanings[0].examples[0].en, "First example.");
+        assert_eq!(
+            mapped.meanings[0].examples[1].en,
+            "Second example for first meaning."
+        );
+    }
+
+    #[test]
+    fn test_merge_unique_examples_preserves_richer_duplicate_translation() {
+        let mut existing = vec![WordExample {
+            en: "The cat sleeps.".to_string(),
+            translation: String::new(),
+        }];
+        let incoming = vec![WordExample {
+            en: "  The   cat sleeps. ".to_string(),
+            translation: "Fonte: exemplo".to_string(),
+        }];
+
+        merge_unique_examples(&mut existing, incoming);
+
+        assert_eq!(existing.len(), 1);
+        assert_eq!(existing[0].en, "The cat sleeps.");
+        assert_eq!(existing[0].translation, "Fonte: exemplo");
+    }
+
+    #[test]
+    fn test_map_wiktionary_meaning_key_avoids_delimiter_collisions() {
+        let json = r#"{
+          "en": [
+            {
+              "partOfSpeech": "noun|verb",
+              "definitions": [
+                {
+                  "definition": "primary",
+                  "examples": ["First example."]
+                }
+              ]
+            },
+            {
+              "partOfSpeech": "noun",
+              "definitions": [
+                {
+                  "definition": "verb|primary",
+                  "examples": ["Second example."]
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: HashMap<String, Vec<WiktionaryEntry>> = serde_json::from_str(json).unwrap();
+        let mapped = map_wiktionary_to_ai_word("test", parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 2);
+        assert_eq!(mapped.meanings[0].examples[0].en, "First example.");
+        assert_eq!(mapped.meanings[1].examples[0].en, "Second example.");
+    }
+
+    #[test]
+    fn test_map_freedict_cleans_definition_before_storage_and_dedupe() {
+        let json = r#"{
+          "word": "test",
+          "entries": [
+            {
+              "partOfSpeech": "noun",
+              "senses": [
+                {
+                  "definition": "<b>A&nbsp;trial.</b>",
+                  "tags": [],
+                  "examples": ["First example."],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": []
+                },
+                {
+                  "definition": " A trial. ",
+                  "tags": [],
+                  "examples": ["Second example."],
+                  "quotes": [],
+                  "synonyms": [],
+                  "antonyms": []
+                }
+              ]
+            }
+          ]
+        }"#;
+
+        let parsed: FreeDictResponse = serde_json::from_str(json).unwrap();
+        let mapped = map_freedict_to_ai_word(parsed).unwrap();
+
+        assert_eq!(mapped.meanings.len(), 1);
+        assert_eq!(mapped.meanings[0].meaning_en, "A trial.");
+        assert_eq!(mapped.meanings[0].meaning_short, "A trial.");
+        assert_eq!(mapped.meanings[0].meaning, "A trial.");
+        assert_eq!(mapped.meanings[0].examples.len(), 2);
+        assert_eq!(mapped.meanings[0].examples[0].en, "First example.");
+        assert_eq!(mapped.meanings[0].examples[1].en, "Second example.");
+    }
+
+    #[test]
+    fn test_word_url_encoding_special_characters() {
+        let mut wiki_url = Url::parse(config::WIKTIONARY_WORD_API_URL_DEFAULT).unwrap();
+        wiki_url
+            .path_segments_mut()
+            .unwrap()
+            .push("c# sharp / test?");
+        let encoded = wiki_url.to_string();
+        assert!(encoded.contains("c%23%20sharp%20%2F%20test%3F"));
     }
 }

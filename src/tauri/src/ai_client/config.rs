@@ -1,19 +1,47 @@
-/// Endpoint OpenAI-compatible do Gemini (Auth: Bearer {key})
-pub const GEMINI_BASE_URL: &str =
-    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+use std::env;
 
-/// Gemini 2.5 Flash — rápido, com melhor raciocínio que o 2.0.
-/// Fallback se der 404: "gemini-2.0-flash-lite" ou "gemini-1.5-flash"
-pub const GEMINI_MODEL: &str = "gemini-2.5-flash";
+/// Base URL default for Free Dictionary word endpoint.
+pub const FREEDICT_WORD_API_URL_DEFAULT: &str = "https://freedictionaryapi.com/api/v1";
+/// Base URL default for Wiktionary definition endpoint.
+pub const WIKTIONARY_WORD_API_URL_DEFAULT: &str = "https://en.wiktionary.org/api/rest_v1/page/definition";
 
-/// Endpoint OpenAI-compatible do GROQ (Auth: Bearer {key})
-pub const GROQ_BASE_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
+/// Base URL default placeholder for Lexio API v2 Translate endpoint.
+pub const LEXIO_TRANSLATE_API_URL_DEFAULT: &str = "https://api.lexio.app/v2/translate";
 
-/// GPT-OSS 20B via GROQ (1000 T/sec — fastest production model)
-pub const GROQ_MODEL: &str = "openai/gpt-oss-20b";
+/// Returns the configured URL for Free Dictionary lookup.
+pub fn freedict_word_api_url() -> String {
+    env::var("LEXIO_WORD_API_URL").unwrap_or_else(|_| FREEDICT_WORD_API_URL_DEFAULT.to_string())
+}
 
-/// Endpoint OpenAI-compatible do Ollama (local) (Auth: Bearer {key} or empty)
-pub const OLLAMA_BASE_URL_DEFAULT: &str = "http://localhost:11434/v1/chat/completions";
+/// Returns the configured URL for Wiktionary lookup.
+pub fn wiktionary_word_api_url() -> String {
+    env::var("LEXIO_WIKTIONARY_API_URL").unwrap_or_else(|_| WIKTIONARY_WORD_API_URL_DEFAULT.to_string())
+}
 
-/// Default model para Ollama — Gemma 4 26B
-pub const OLLAMA_MODEL_DEFAULT: &str = "gemma4:26b";
+/// Returns the configured URL for translation (reads LEXIO_TRANSLATE_API_URL or defaults).
+pub fn translate_api_url() -> String {
+    env::var("LEXIO_TRANSLATE_API_URL").unwrap_or_else(|_| LEXIO_TRANSLATE_API_URL_DEFAULT.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_freedict_word_api_url_default() {
+        env::remove_var("LEXIO_WORD_API_URL");
+        assert_eq!(freedict_word_api_url(), FREEDICT_WORD_API_URL_DEFAULT);
+    }
+
+    #[test]
+    fn test_wiktionary_word_api_url_default() {
+        env::remove_var("LEXIO_WIKTIONARY_API_URL");
+        assert_eq!(wiktionary_word_api_url(), WIKTIONARY_WORD_API_URL_DEFAULT);
+    }
+
+    #[test]
+    fn test_translate_api_url_default() {
+        env::remove_var("LEXIO_TRANSLATE_API_URL");
+        assert_eq!(translate_api_url(), LEXIO_TRANSLATE_API_URL_DEFAULT);
+    }
+}
