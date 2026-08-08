@@ -4,7 +4,7 @@ use tauri::{AppHandle, WebviewWindow};
 pub fn height_for_state(state: &str) -> Option<u32> {
     match state {
         "idle" => Some(110),
-        "result" => Some(420),
+        "result" => Some(600),
         "translate" => Some(320),
         _ => None,
     }
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn test_resize_state_mapping() {
         assert_eq!(height_for_state("idle"), Some(110));
-        assert_eq!(height_for_state("result"), Some(420));
+        assert_eq!(height_for_state("result"), Some(600));
         assert_eq!(height_for_state("translate"), Some(320));
     }
 

@@ -7,7 +7,7 @@ interface ModeTabsProps {
 
 const TABS: Array<{ id: AppMode; label: string; testId: string }> = [
   { id: 'dictionary', label: 'Dicionário', testId: 'mode-tab-dictionary' },
-  { id: 'translate', label: 'Traduzir', testId: 'mode-tab-translate' },
+  // { id: 'translate', label: 'Traduzir', testId: 'mode-tab-translate' },
 ]
 
 export function ModeTabs({ mode, onChange }: ModeTabsProps) {

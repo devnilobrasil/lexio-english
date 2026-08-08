@@ -26,7 +26,7 @@ describe('TitleBar', () => {
 
     expect(screen.getByTestId('titlebar-logo')).toBeInTheDocument()
     expect(screen.getByTestId('mode-tab-dictionary')).toBeInTheDocument()
-    expect(screen.getByTestId('mode-tab-translate')).toBeInTheDocument()
+    // expect(screen.getByTestId('mode-tab-translate')).toBeInTheDocument()
     expect(screen.getByTestId('window-controls')).toBeInTheDocument()
   })
 

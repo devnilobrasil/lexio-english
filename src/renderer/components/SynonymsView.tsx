@@ -29,7 +29,7 @@ export function SynonymsView({ word, onSelect }: SynonymsViewProps) {
     <div className="word-card-enter">
       {hasContexts && (
         <div className="mb-5">
-          <SectionLabel>Contexts</SectionLabel>
+          <SectionLabel>{t('word.contexts', 'Contexts')}</SectionLabel>
           <div className="flex flex-wrap gap-2">
             {word.contexts.map((ctx) => (
               <span
