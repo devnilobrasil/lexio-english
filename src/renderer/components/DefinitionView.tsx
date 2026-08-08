@@ -4,14 +4,35 @@ import { useTranslation } from 'react-i18next'
 import type { Word } from '../../types'
 import { SectionLabel } from './SectionLabel'
 
+
 interface DefinitionViewProps {
   word: Word
   onToggleSaved: () => void
   onSelectSynonym: (synonym: string) => void
 }
 
+function getPartOfSpeechFromContext(context: string, fallbackPos: Word['pos']) {
+  const normalizedContext = context.trim()
+  if (normalizedContext) {
+    const [head] = normalizedContext.split('(')
+    const partOfSpeech = head.trim()
+    if (partOfSpeech) {
+      return partOfSpeech
+    }
+  }
+
+  return fallbackPos ?? 'other'
+}
+
 export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: DefinitionViewProps) {
   const { t } = useTranslation()
+  const groupedMeanings = word.meanings.reduce<Map<string, typeof word.meanings>>((groups, meaning) => {
+    const partOfSpeech = getPartOfSpeechFromContext(meaning.context, word.pos)
+    const existingGroup = groups.get(partOfSpeech) ?? []
+    existingGroup.push(meaning)
+    groups.set(partOfSpeech, existingGroup)
+    return groups
+  }, new Map())
 
   return (
     <div className="word-card-enter">
@@ -23,18 +44,26 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
           </h1>
           <div className="flex items-center gap-2.5">
             {word.phonetic && (
-              <span className="font-serif text-example italic text-text-muted">
+              <span className="font-sans text-example italic text-text-muted">
                 {word.phonetic}
               </span>
             )}
-            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
-            <span className="font-sans text-xs text-text-muted">
-              {word.pos}
-            </span>
-            <div className="w-0.5 h-0.5 rounded-full bg-separator" />
-            <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
-              {word.level ? t(`level.${word.level}`) : word.level}
-            </span>
+            {word.phonetic && word.pos && (
+              <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+            )}
+            {word.pos && (
+              <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
+                {word.pos}
+              </span>
+            )}
+            {word.pos && word.level && (
+              <div className="w-0.5 h-0.5 rounded-full bg-separator" />
+            )}
+            {word.level && (
+              <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
+                {t(`level.${word.level}`)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -65,21 +94,35 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
       {/* Meanings */}
       <div className="mb-5">
         <SectionLabel>{t('word.meaning')}</SectionLabel>
-        {word.meanings.map((m, i) => (
-          <div key={i} className={i > 0 ? 'mt-4' : ''}>
-            <span className="font-sans text-label font-medium tracking-badge uppercase text-tag-text">
-              {m.context}
-            </span>
-            <p data-testid={`meaning-short-${i}`} className="font-serif text-base text-text-primary mt-1 mb-1">
-              {m.meaning_short}
-            </p>
-            {m.meaning_en && (
-              <p className="font-sans text-meta italic text-text-muted">
-                {m.meaning_en}
-              </p>
-            )}
-          </div>
-        ))}
+        {Array.from(groupedMeanings.entries()).map(([partOfSpeech, meanings], groupIndex) => {
+          return (
+            <div key={partOfSpeech} className={groupIndex > 0 ? 'mt-4' : ''}>
+              <div className="mt-1.5 mb-2">
+                <span className="font-sans text-label font-medium tracking-badge uppercase bg-surface-sunken text-tag-text border border-border-subtle rounded-sm px-2 py-0.5">
+                  {partOfSpeech}
+                </span>
+              </div>
+              {meanings.map((meaning, meaningIndex) => {
+                return (
+                  <div
+                    key={`${partOfSpeech}-${meaningIndex}`}
+                    className={`py-2.5 ${meaningIndex > 0 ? 'border-t border-border-muted' : 'pt-1.5'}`}
+                  >
+                    <p
+                      data-testid={`meaning-short-${groupIndex}-${meaningIndex}`}
+                      className="font-sans text-example text-text-secondary leading-comfortable"
+                    >
+                      <span className="font-sans text-xs font-semibold text-text-primary mr-1.5">
+                        {meaningIndex + 1}.
+                      </span>
+                      {' '}{meaning.meaning_short}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
 
       {/* Verb Forms */}
@@ -106,16 +149,6 @@ export function DefinitionView({ word, onToggleSaved, onSelectSynonym }: Definit
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Explicação detalhada do primeiro significado */}
-      {word.meanings[0]?.meaning && (
-        <div className="mb-1">
-          <SectionLabel>{t('word.tip')}</SectionLabel>
-          <p className="font-sans text-meta italic text-text-muted">
-            {word.meanings[0].meaning}
-          </p>
         </div>
       )}
     </div>
