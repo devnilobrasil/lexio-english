@@ -1,17 +1,24 @@
 ---
 name: feature-planning
-description: Use when planning a new feature from scratch — from user intent to implementable phase documents. Covers the full planning lifecycle: brainstorming, SPEC.md, phase files, README, and skill creation. Applies to any non-trivial feature in the Lexio project.
+description: Use when planning a new feature from scratch — from user intent to implementable task documents. Covers the full planning lifecycle: brainstorming, SPEC.md, TASK-MANAGER.md, task files, README, and skill creation. Applies to any non-trivial feature in the Lexio project.
 ---
 
 # Feature Planning
 
 ## Visão geral
 
-Toda feature não-trivial no Lexio passa por 3 artefatos antes de qualquer código ser escrito:
+Toda feature não-trivial no Lexio produz os seguintes artefatos:
+
+**Planejamento** (criados antes de qualquer código):
 
 1. **`SPEC.md`** — Especificação técnica completa (o que, por que, contratos IPC, riscos).
-2. **Arquivos de fase** (`fase-N-*.md`) — Planos de execução sequenciais, cada um autocontido.
-3. **`README.md`** — Índice da pasta com tabela de arquivos e ordem de execução.
+2. **`TASK-MANAGER.md`** — Plano de execução e breakdown de todas as tasks.
+3. **Arquivos de task** (`task-TN-*.md`) — Detalhamento sequencial de cada task, cada um autocontido.
+4. **`README.md`** — Índice da pasta com tabela de arquivos e ordem de execução.
+
+**Execução** (criado antes de T0, atualizado continuamente):
+
+5. **`PROGRESS.md`** — Log de progresso da implementação: status por task, o que funcionou, dificuldades, desvios e contexto para novas sessões retomarem de onde pararam.
 
 Os artefatos vivem em `.claude/<nome-da-feature>/`. Exemplo: `.claude/inline-translation/`.
 
@@ -35,8 +42,8 @@ Os artefatos vivem em `.claude/<nome-da-feature>/`. Exemplo: `.claude/inline-tra
 | **Claude Code (claude.ai/code ou CLI)** | Ambiente de execução |
 | **Superpowers plugin** (v5.0.7+) | Acesso a todas as skills abaixo |
 | **GitHub MCP** | Criar PR automaticamente após merge |
-| **Modelo Opus 4.6** | Fases com Rust complexo, IPC, concorrência |
-| **Modelo Sonnet 4.6** | Brainstorming, SPEC.md, fases de CSS/React simples |
+| **Modelo Opus 4.6** | Tasks com Rust complexo, IPC, concorrência |
+| **Modelo Sonnet 4.6** | Brainstorming, SPEC.md, tasks de CSS/React simples |
 
 ---
 
@@ -154,9 +161,9 @@ Objetivo (1 parágrafo)
    ### Frontend Vitest
    ### E2E Playwright
 
-## 12. Fases de execução (sumário)
-   Fase 1 — <nome>: lista de ítens
-   Fase 2 — <nome>: lista de ítens
+## 12. Tasks de execução (sumário)
+   T0 — <nome>: lista de ítens
+   T1 — <nome>: lista de ítens
    ...
 
 ## 13. Extensibilidade para features futuras
@@ -176,34 +183,99 @@ Objetivo (1 parágrafo)
 - Blocos de código Rust e TypeScript para contratos IPC
 - Seção de riscos **sempre inclui** segurança (campos de password, API keys, etc.)
 - Tamanho alvo: 300–500 linhas
-- Após escrever, apresentar ao usuário e pedir feedback antes de criar as fases
+- Após escrever, apresentar ao usuário e pedir feedback antes de criar as tasks
 
 ---
 
-### Fase D — Criar os arquivos de fase
+### Fase D — Criar os artefatos de implementação
 
-**Modelo por fase:**
+Após a aprovação do SPEC.md, o próximo passo é criar o **Task Manager** e os **arquivos de task** que guiarão a implementação.
 
-| Tipo de fase | Modelo recomendado | Por quê |
+#### D1 — Criar o `TASK-MANAGER.md`
+
+**Modelo:** `claude-sonnet-4-6`
+
+**Local:** `.claude/<nome-da-feature>/TASK-MANAGER.md`
+
+O Task Manager é o documento central de referência para implementação. Reúne todas as tasks de forma concisa, define o plano de execução (sequencial/paralelo) e o detalhamento resumido de cada task.
+
+**Estrutura obrigatória do TASK-MANAGER.md:**
+
+````markdown
+# Task Manager — <Nome da Feature>
+
+## Plano de Execução
+
+Sequência de execução das tasks. Tasks dentro da mesma fase de execução podem ser feitas em paralelo.
+
+| Fase de Execução | Tasks | Descrição |
 |---|---|---|
-| Fase com Rust complexo (async, MutexGuard, threads, rdev) | `claude-opus-4-6` | Requer raciocínio profundo sobre concorrência e lifetimes |
-| Fase de frontend React/CSS | `claude-sonnet-4-6` | Lógica simples, sem concorrência |
-| Fase de integração (conectar tudo) | `claude-opus-4-6` | Race conditions e timing entre camadas |
-| Fase de polish e edge cases | `claude-sonnet-4-6` | Iterativo, sem novidade técnica |
-| Fase de scaffolding/configuração | `claude-sonnet-4-6` | JSON/TOML, sem lógica |
+| Fase 0 | T0, T1 | <Descrição breve do que essas tasks entregam juntas> |
+| Fase 1 | T2, T3, T4 | <Descrição breve> |
+| Fase 2 | T5 | <Descrição breve> |
 
-**Local:** `.claude/<nome-da-feature>/fase-N-<descricao>.md`
+---
 
-**Convenção de nome:** `fase-1-backend-deteccao.md`, `fase-2-frontend-dialog.md` (número + camada + descrição)
+## Task Breakdown
 
-**Estrutura obrigatória de cada arquivo de fase:**
+### T0 — <Nome da Task>
 
-```markdown
-# Fase N — <Título>
+| Campo | Detalhe |
+|---|---|
+| **What** | O que esta task faz (1 frase clara) |
+| **Where** | Arquivos/módulos onde será implementada |
+| **Dependências** | Tasks que precisam estar concluídas antes (ou "—" se nenhuma) |
+| **Reuses** | Código/funções existentes que serão reaproveitadas (ou "—") |
+| **Requisitos** | O que deve ser implementado nesta task |
+| **Pré-requisitos** | Condições de ambiente/estado que precisam existir |
+| **Done when** | Critério objetivo e verificável de conclusão |
+
+### T1 — <Nome da Task>
+
+| Campo | Detalhe |
+|---|---|
+| **What** | ... |
+| **Where** | ... |
+| **Dependências** | T0 |
+| **Reuses** | ... |
+| **Requisitos** | ... |
+| **Pré-requisitos** | ... |
+| **Done when** | ... |
+````
+
+**Regras do TASK-MANAGER.md:**
+- Uma task por responsabilidade — não agrupar Rust + React na mesma task
+- "Done when" deve ser verificável (teste automatizado ou ação manual mensurável)
+- Dependências explícitas evitam bloqueios de implementação
+- Reuses devem listar caminhos exatos e assinaturas de funções quando possível
+- Número de tasks: entre 3 e 8. Mais de 8 indica que a feature está grande demais (dividir em specs separados)
+
+---
+
+#### D2 — Criar os arquivos de task
+
+**Modelo por task:**
+
+| Tipo de task | Modelo recomendado | Por quê |
+|---|---|---|
+| Task com Rust complexo (async, MutexGuard, threads, rdev) | `claude-opus-4-6` | Requer raciocínio profundo sobre concorrência e lifetimes |
+| Task de frontend React/CSS | `claude-sonnet-4-6` | Lógica simples, sem concorrência |
+| Task de integração (conectar tudo) | `claude-opus-4-6` | Race conditions e timing entre camadas |
+| Task de polish e edge cases | `claude-sonnet-4-6` | Iterativo, sem novidade técnica |
+| Task de scaffolding/configuração | `claude-sonnet-4-6` | JSON/TOML, sem lógica |
+
+**Local:** `.claude/<nome-da-feature>/task-TN-<descricao>.md`
+
+**Convenção de nome:** `task-T0-backend-detection.md`, `task-T1-frontend-dialog.md` (código T + número + camada + descrição)
+
+**Estrutura obrigatória de cada arquivo de task:**
+
+````markdown
+# T<N> — <Título>
 
 **Objetivo:** <1 frase clara do que será construído e do estado ao final>
 
-**Referência:** `SPEC.md` — Seções X, Y, Z
+**Referência:** `SPEC.md` — Seções X, Y, Z | `TASK-MANAGER.md` — T<N>
 
 ---
 
@@ -221,12 +293,13 @@ Objetivo (1 parágrafo)
 ---
 
 ## Pré-requisitos
-- Fase anterior concluída (critérios de saída verificados)
+- Tasks dependentes concluídas (verificar TASK-MANAGER.md)
 - Comandos de verificação de baseline
 
 ---
 
-## Estrutura de Arquivos desta Fase
+## Estrutura de Arquivos desta Task
+
 ```
 arquivos/
 ├── novo.rs    ← NOVO
@@ -240,7 +313,8 @@ arquivos/
 
 ---
 
-## Verificação da Fase N
+## Verificação
+
 ```bash
 comandos de verificação
 ```
@@ -251,30 +325,28 @@ comandos de verificação
 
 ---
 
-## Arquivos Criados nesta Fase
-## Arquivos Modificados nesta Fase
-```
+## Arquivos Criados nesta Task
+## Arquivos Modificados nesta Task
+````
 
-**Regras por arquivo de fase:**
+**Regras por arquivo de task:**
 - Código **concreto** — não pseudocódigo quando possível. O implementador deve poder copiar e colar.
 - Testes escritos **antes** da implementação (TDD — ver `superpowers:test-driven-development`)
-- Cada fase tem um **critério de saída claro** — testes automatizados + checklist manual
-- A Fase 1 **sempre** limpa o código obsoleto antes de criar o novo
-- A Fase final **sempre** aponta para `superpowers:finishing-a-development-branch`
-- **Nunca** mencionar a Fase seguinte dentro de uma fase — cada fase é autocontida
+- Cada task tem um **critério de saída claro** — testes automatizados + checklist manual
+- A T0 **sempre** limpa o código obsoleto antes de criar o novo
+- A task final **sempre** aponta para `superpowers:finishing-a-development-branch`
+- **Nunca** mencionar a task seguinte dentro de uma task — cada task é autocontida
 
-**Número de fases:** entre 3 e 6. Mais de 6 indica que a feature está grande demais (dividir em specs separados).
+**Skills sempre presentes no cabeçalho de toda task:**
 
-**Skills sempre presentes no cabeçalho de toda fase:**
-
-| Se a fase toca | Incluir skill |
+| Se a task toca | Incluir skill |
 |---|---|
 | Qualquer IPC Tauri | `tauri-architecture` |
 | Qualquer CSS ou JSX | `lexio-design-system` |
 | Qualquer SQL ou SQLite | `sqlite-patterns` |
 | Qualquer código Rust | `rust-patterns` |
-| Fase de integração | `superpowers:systematic-debugging` |
-| Fase final | `superpowers:finishing-a-development-branch` |
+| Task de integração | `superpowers:systematic-debugging` |
+| Task final | `superpowers:finishing-a-development-branch` |
 | Branch nova | `superpowers:using-git-worktrees` |
 
 ---
@@ -287,22 +359,25 @@ comandos de verificação
 
 **Estrutura:**
 
-```markdown
+````markdown
 # Lexio — <Nome da Feature>
 
 ## Arquivos
 | Arquivo | Conteúdo |
 |---|---|
 | `SPEC.md` | Especificação técnica completa (arquivo-mãe) |
-| `fase-N-*.md` | Descrição em 1 linha |
+| `TASK-MANAGER.md` | Plano de execução e breakdown de todas as tasks |
+| `task-TN-*.md` | Descrição em 1 linha por task |
+| `PROGRESS.md` | Log de progresso da implementação (atualizado a cada task) |
 
 ## Ordem de Execução
-Fases devem ser executadas em sequência: 1 → 2 → ... → N.
-Cada fase tem um **critério de saída** — não avançar sem que esteja satisfeito.
+Seguir o Plano de Execução definido em `TASK-MANAGER.md`.
+Cada task tem um **critério de saída (Done when)** — não avançar sem que esteja satisfeito.
 
-| Fase | Modelo | Descrição |
+| Task | Modelo | Descrição |
 |---|---|---|
-| Fase 1 | `claude-opus-4-6` | ... |
+| T0 | `claude-opus-4-6` | ... |
+| T1 | `claude-sonnet-4-6` | ... |
 
 ## Princípio Central
 <1-2 frases explicando o propósito da feature>
@@ -312,7 +387,7 @@ Cada fase tem um **critério de saída** — não avançar sem que esteja satisf
 
 ## Tipos TS novos (se houver)
 <interfaces/tipos adicionados>
-```
+````
 
 ---
 
@@ -335,6 +410,70 @@ description: Use when <trigger claro>. Covers <o que cobre>. Applies to <escopo>
 
 ---
 
+### Fase G — Criar o `PROGRESS.md` (antes de iniciar T0)
+
+> Este é um artefato de **execução**, não de planejamento. É criado imediatamente antes de começar a primeira task e atualizado ao final de cada task concluída.
+
+**Modelo:** `claude-sonnet-4-6`
+
+**Local:** `.claude/<nome-da-feature>/PROGRESS.md`
+
+**Propósito:** Permitir que qualquer nova sessão do Claude Code entenda exatamente onde a implementação está, o que foi feito, o que deu errado, e o que precisa ser feito a seguir — sem depender do histórico de chat.
+
+**Estrutura obrigatória do PROGRESS.md:**
+
+````markdown
+# Progress — <Nome da Feature>
+
+**Branch:** `feat/<nome-da-feature>`
+**Referências:** `SPEC.md` | `TASK-MANAGER.md`
+
+---
+
+## Status das Tasks
+
+| Task | Status | Resumo |
+|---|---|---|
+| T0 — <Nome> | ✅ Concluída | <1 linha do que foi feito> |
+| T1 — <Nome> | 🔄 Em progresso | <onde está> |
+| T2 — <Nome> | ⏳ Pendente | — |
+| T3 — <Nome> | ❌ Bloqueada | <motivo do bloqueio> |
+
+> Legenda: ✅ Concluída · 🔄 Em progresso · ⏳ Pendente · ❌ Bloqueada
+
+---
+
+## Log de Execução
+
+### T0 — <Nome> ✅
+**O que funcionou:** <breve descrição do que foi implementado com sucesso>
+**Dificuldades:** <problemas encontrados e como foram resolvidos>
+**Desvios do plano:** <o que foi diferente do TASK-MANAGER.md e por quê>
+
+### T1 — <Nome> 🔄
+**Estado atual:** <o que já foi feito dentro desta task>
+**Próximos passos:** <o que falta para concluir>
+**Bloqueios:** <se houver, o que impede o avanço>
+
+---
+
+## Contexto para a próxima sessão
+
+**Última task concluída:** T0
+**Task atual / próxima:** T1
+**Estado do ambiente:** <branch, build passando ou não, testes rodando>
+**Atenção:** <algo crítico que a próxima sessão precisa saber antes de continuar>
+````
+
+**Regras do PROGRESS.md:**
+- Atualizar **obrigatoriamente** ao final de cada task concluída — não deixar para depois
+- O campo "Contexto para a próxima sessão" deve ser suficiente para retomar o trabalho sem ler o histórico de chat
+- "Desvios do plano" é obrigatório mesmo que seja "nenhum" — confirma que o plano foi seguido
+- Se uma task foi bloqueada, documentar o bloqueio antes de mudar de assunto
+- Nunca apagar entradas antigas — o histórico de acertos e erros é parte do valor do documento
+
+---
+
 ## Checklist de qualidade antes de entregar os artefatos
 
 ### SPEC.md
@@ -345,20 +484,32 @@ description: Use when <trigger claro>. Covers <o que cobre>. Applies to <escopo>
 - [ ] Idioma: Português
 - [ ] Tamanho: 300–500 linhas
 
-### Arquivos de fase
-- [ ] Cada fase tem modelo recomendado com justificativa
-- [ ] Cada fase tem tabela de skills a ler antes de implementar
-- [ ] Cada fase tem critério de saída com checklist
+### TASK-MANAGER.md
+- [ ] Plano de Execução com fases sequenciais/paralelas e descrição por fase
+- [ ] Task Breakdown com todos os campos (What, Where, Dependências, Reuses, Requisitos, Pré-requisitos, Done when)
+- [ ] "Done when" é verificável em todas as tasks
+- [ ] Dependências entre tasks são explícitas
+
+### Arquivos de task
+- [ ] Cada task tem modelo recomendado com justificativa
+- [ ] Cada task tem tabela de skills a ler antes de implementar
+- [ ] Cada task tem critério de saída com checklist
 - [ ] Código concreto (não só pseudocódigo)
-- [ ] Fase 1 limpa código obsoleto
-- [ ] Fase final aponta para `finishing-a-development-branch`
-- [ ] TDD: testes aparecem antes da implementação em cada fase
+- [ ] T0 limpa código obsoleto
+- [ ] Task final aponta para `finishing-a-development-branch`
+- [ ] TDD: testes aparecem antes da implementação em cada task
 
 ### README.md
-- [ ] Tabela de todos os arquivos
-- [ ] Tabela de fases com modelo recomendado
+- [ ] Tabela de todos os arquivos (incluindo TASK-MANAGER.md e PROGRESS.md)
+- [ ] Tabela de tasks com modelo recomendado
 - [ ] Princípio central em 1-2 frases
 - [ ] Dependências novas listadas
+
+### PROGRESS.md
+- [ ] Criado antes de iniciar T0
+- [ ] Tabela de status com todas as tasks listadas
+- [ ] "Contexto para a próxima sessão" preenchido após cada task
+- [ ] "Desvios do plano" registrado mesmo quando é "nenhum"
 
 ---
 
@@ -388,11 +539,16 @@ description: Use when <trigger claro>. Covers <o que cobre>. Applies to <escopo>
 
 | Anti-padrão | Correto |
 |---|---|
-| Escrever código antes de ter o SPEC aprovado | SPEC → aprovação → fases |
-| Fase com pseudocódigo vago ("implementar X") | Código concreto com imports, assinaturas e lógica |
-| Misturar Rust e React na mesma fase | Uma fase por camada |
+| Escrever código antes de ter o SPEC aprovado | SPEC → aprovação → tasks |
+| Task com pseudocódigo vago ("implementar X") | Código concreto com imports, assinaturas e lógica |
+| Misturar Rust e React na mesma task | Uma task por camada |
 | SPEC sem seção de riscos | Sempre incluir riscos, mesmo que o impacto seja baixo |
-| Escolher Sonnet para fase com Rust async | Usar Opus para qualquer fase com MutexGuard/lifetimes/threads |
-| Não referenciar skills no cabeçalho de cada fase | Sempre listar skills relevantes — o implementador não vai lembrar |
+| Escolher Sonnet para task com Rust async | Usar Opus para qualquer task com MutexGuard/lifetimes/threads |
+| Não referenciar skills no cabeçalho de cada task | Sempre listar skills relevantes — o implementador não vai lembrar |
 | Criar spec genérico ("passive-suggestions") para feature específica | Nome específico + extensível via pastas irmãs |
 | Começar implementação sem worktree | Sempre criar branch isolada via `superpowers:using-git-worktrees` |
+| "Done when" vago ("quando funcionar") | Critério verificável: teste que passa, ação mensurável |
+| Task sem campo de Dependências | Sempre declarar dependências, mesmo que sejam "—" (nenhuma) |
+| Não criar PROGRESS.md antes de T0 | Criar antes da primeira task — a estrutura vazia já é contexto útil |
+| Atualizar PROGRESS.md "depois" ao invés de imediatamente | Atualizar ao final de cada task, enquanto o contexto ainda está fresco |
+| Apagar entradas antigas do log de execução | Nunca apagar — o histórico de erros e acertos é parte do valor do documento |
