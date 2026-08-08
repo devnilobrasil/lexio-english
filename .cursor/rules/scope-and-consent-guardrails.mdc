@@ -1,0 +1,26 @@
+---
+description: Enforce strict scope and user consent before implementing extra changes
+alwaysApply: true
+---
+
+# Scope And Consent Guardrails
+
+- Treat the user's request as the hard scope boundary.
+- Do not add features, refactors, migrations, or architecture changes unless explicitly requested.
+- If reviews/findings surface issues outside requested scope, report them first and wait for explicit approval before implementing.
+- "Critical" does not auto-authorize implementation; user consent is still required.
+- Never chain autonomous fix cycles for out-of-scope findings.
+- If unsure whether a change is in-scope, ask a direct yes/no clarification before coding.
+
+## Required pre-change check
+
+Before each implementation block, verify:
+1. Is this change directly required by the latest user request?
+2. Did the user explicitly approve this exact extra change?
+
+If any answer is "no", stop and ask.
+
+## Example
+
+- ❌ Bad: "Review found settings issues, so I fixed settings too."
+- ✅ Good: "Review found settings issues outside scope. Do you want me to fix them now?"

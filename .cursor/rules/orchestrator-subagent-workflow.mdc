@@ -1,0 +1,33 @@
+---
+description: Default orchestrator workflow and model policy for feature planning, implementation, and review
+alwaysApply: true
+---
+
+# Orchestrator Subagent Workflow
+
+Use this workflow for feature work unless the user explicitly requests a different flow.
+
+## Required phases for a feature
+
+1. Planning phase with a planning subagent
+2. Implementation phase with an implementation subagent
+3. Review phase with a review subagent
+
+The orchestrator must coordinate these phases and report results clearly between steps.
+
+## Default model policy
+
+- Planning subagent: **Luna Medium**
+- Review subagent: **Luna Medium**
+- Implementation subagent: **Codex 5.3**
+- Orchestrator model: **the model selected in the current session**
+
+## Model override policy
+
+- Do not change these default model assignments unless the user gives an explicit request to change them.
+- If a user requests another model for a phase, apply only that requested change and keep the rest at default.
+
+## Scope policy during orchestration
+
+- Keep each phase strictly scoped to the user request.
+- If review finds out-of-scope issues, present them and ask for approval before implementing any extra fixes.
