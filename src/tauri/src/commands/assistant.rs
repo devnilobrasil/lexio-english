@@ -7,8 +7,6 @@ use arboard::Clipboard;
 use tauri::State;
 
 use crate::ai_client;
-use crate::ai_client::config::{OLLAMA_BASE_URL_DEFAULT, OLLAMA_MODEL_DEFAULT};
-use crate::db::settings as db_settings;
 use crate::state::AppState;
 use crate::types::TranslationResponse;
 
@@ -60,67 +58,9 @@ pub async fn assistant_translate(
         return Err("Texto demasiado longo para traduzir.".to_string());
     }
 
-    let provider = {
-        let conn = state
-            .db
-            .lock()
-            .map_err(|e| format!("Failed to lock db: {}", e))?;
-
-        db_settings::get_selected_provider(&conn)
-            .map_err(|e| format!("DB error: {}", e))?
-            .unwrap_or_else(|| "gemini".to_string())
-    };
-
-    let (api_key, ollama_base_url, ollama_model) = {
-        let conn = state
-            .db
-            .lock()
-            .map_err(|e| format!("Failed to lock db: {}", e))?;
-
-        let key = match provider.as_str() {
-            "groq" => db_settings::get_groq_api_key(&conn),
-            "ollama" => Ok(Some(String::new())),
-            _ => db_settings::get_api_key(&conn),
-        };
-        let key = key
-            .map_err(|e| format!("DB error: {}", e))?
-            .unwrap_or_default();
-
-        let ollama_url = db_settings::get_ollama_base_url(&conn)
-            .map_err(|e| format!("DB error: {}", e))?
-            .unwrap_or_else(|| OLLAMA_BASE_URL_DEFAULT.to_string());
-
-        let ollama_mdl = db_settings::get_ollama_model(&conn)
-            .map_err(|e| format!("DB error: {}", e))?
-            .unwrap_or_else(|| OLLAMA_MODEL_DEFAULT.to_string());
-
-        (key, ollama_url, ollama_mdl)
-    };
-
-    if provider != "ollama" && api_key.is_empty() {
-        return Err(format!(
-            "Chave {} não configurada. Acesse Configurações.",
-            provider
-        ));
-    }
-
-    let timeout_secs = if provider == "ollama" { 120u64 } else { AI_TIMEOUT_SECS };
-    let http = if provider == "ollama" {
-        &state.http_local
-    } else {
-        &state.http
-    };
-
     let translation = match tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        ai_client::fetch_translation(
-            http,
-            &provider,
-            &api_key,
-            &original_text,
-            &ollama_base_url,
-            &ollama_model,
-        ),
+        std::time::Duration::from_secs(AI_TIMEOUT_SECS),
+        ai_client::fetch_translation(&state.http, None, &original_text),
     )
     .await
     {
@@ -198,16 +138,6 @@ mod tests {
             classify_selection(Some("  olá mundo  ".into()), |_| false),
             SelectionKind::Ready("olá mundo".into())
         );
-    }
-
-    #[test]
-    fn missing_api_key_message_includes_provider() {
-        let provider = "gemini";
-        let msg = format!(
-            "Chave {} não configurada. Acesse Configurações.",
-            provider
-        );
-        assert!(msg.contains("gemini"));
     }
 
     #[test]

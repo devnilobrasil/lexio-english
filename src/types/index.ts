@@ -57,28 +57,6 @@ export interface AIWordResponse {
   contexts: string[]
 }
 
-// API IPC exposta ao renderer via contextBridge
-export interface LexioAPI {
-  getWord:        (word: string, locale: Locale)          => Promise<Word | null>
-  saveWord:       (data: AIWordResponse, locale: Locale)  => Promise<Word>
-  toggleSaved:    (word: string)                          => Promise<Word>
-  deleteWord:          (word: string) => Promise<void>
-  removeFromHistory:   (word: string) => Promise<void>
-  unsaveWord:          (word: string) => Promise<void>
-  getHistory:     (locale: Locale, limit?: number)        => Promise<Word[]>
-  getSaved:       (locale: Locale)                        => Promise<Word[]>
-  closeWindow:    ()                                      => void
-  minimizeWindow: ()                                      => void
-  resizeWindow:   (state: 'idle' | 'result')              => void
-  getApiKey:      ()                                      => Promise<string | null>
-  setApiKey:      (key: string)                           => Promise<void>
-  getAppVersion:  ()                                      => Promise<string>
-  onUpdateAvailable:  (cb: (version: string) => void) => void
-  onUpdateProgress:   (cb: (pct: number) => void)     => void
-  onUpdateDownloaded: (cb: (version: string) => void) => void
-  installUpdate:      ()                              => void
-}
-
 export type AssistantState =
   | 'idle'
   | 'loading'
@@ -96,9 +74,3 @@ export interface AssistantTextReadyPayload {
   text: string
 }
 
-// Augment global window para o renderer reconhecer window.lexio
-declare global {
-  interface Window {
-    lexio: LexioAPI
-  }
-}

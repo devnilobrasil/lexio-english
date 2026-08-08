@@ -30,7 +30,8 @@
     "verbPast": "Passado simples",
     "verbPastParticiple": "Particípio passado",
     "verbPresentParticiple": "Gerúndio",
-    "verbThirdPerson": "3ª pessoa"
+    "verbThirdPerson": "3ª pessoa",
+    "contexts": "Contextos"
   },
   "level": {
     "Basic": "Básico",
